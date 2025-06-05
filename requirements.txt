@@ -1,0 +1,27 @@
+# Essential dependencies for KeyPoint-MoSeq behavioral analysis
+# 
+# Install these in your conda environment:
+# conda create -n kpms python=3.9
+# conda activate kpms
+# pip install -r requirements.txt
+# pip install keypoint-moseq
+
+# Core scientific computing
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+
+# JAX ecosystem (for GPU acceleration)
+jax>=0.3.0
+jaxlib>=0.3.0
+
+# Visualization
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Data handling
+h5py>=3.6.0
+tqdm>=4.60.0
+
+# Note: Install keypoint-moseq separately:
+# pip install keypoint-moseq 

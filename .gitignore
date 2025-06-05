@@ -1,0 +1,12 @@
+*.csv
+*.mp4
+*.h5
+*/__pycache__/
+*/.ipynb_checkpoints/
+*/.vscode/
+*/.idea/
+*/.DS_Store
+*/.pytest
+*.ipynb
+results/
+
