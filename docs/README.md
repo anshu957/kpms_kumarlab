@@ -33,6 +33,7 @@ conda activate kpms
 pip install -r requirements.txt
 pip install keypoint-moseq
 ```
+💡 Tip: If installing on HPC, make sure you first run the interactive session with a GPU and then install keypoint-moseq package. 
 
 ### Data Setup
 
@@ -56,7 +57,7 @@ Open and run `notebooks/main.ipynb` which demonstrates the complete pipeline:
 ## Project Structure
 
 ```
-unsupervised_behavior_jax/
+kpms_kumarlab/
 ├── data/                    # Place your raw H5 pose files here
 ├── examples/jabs600_v2/
 │   ├── poses/              # CSV pose files (converted or direct)
