@@ -131,8 +131,7 @@ model, model_name, results = fit_and_save_model(data, metadata, pca, config_func
 
 - Python 3.9+
 - JAX with GPU support (recommended)
-- 8+ GB RAM
-- CUDA support (optional, for GPU acceleration)
+- CUDA support (for GPU acceleration)
 
 ## Documentation
 
@@ -148,7 +147,7 @@ python test_essential.py
 
 ## Contributing
 
-This is a research toolkit. Please refer to the Kumar Lab for collaboration guidelines.
+This is a research toolkit. Please refer to the [Kumar Lab](https://github.com/KumarLabJax) for collaboration guidelines.
 
 ## License
 
