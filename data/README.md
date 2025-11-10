@@ -1,21 +1,16 @@
-## This folder will contain raw video and pose data for the project.
+# Data Directory
 
-## If you have multiple datasets, you can create a subfolder for each dataset.
+Use symlinks to external datasets:
 
-## The folder structure should be as follows:
-
-```
-dataset_name
-├── videos
-│   ├── video1.mp4
-│   └── video2.mp4
-├── poses
-│   ├── video1.h5
-│   └── video2.h5
-├── poses_csv
-│   ├── video1.csv
-│   └── video2.csv
+```bash
+cd data/
+ln -s ~/datasets/behavioral_data/experiment_1 exp1
+ln -s ~/datasets/behavioral_data/experiment_2 exp2
 ```
 
-## NOTE: 
-As an example, you can look at the `examples` folder.
+Then reference in scripts:
+
+```bash
+python scripts/preprocess_poses.py --input data/exp1/raw_h5/ --output data/exp1/poses/
+python scripts/train_kpms.py --pose-dir data/exp1/poses/ --video-dir data/exp1/videos/ ...
+```

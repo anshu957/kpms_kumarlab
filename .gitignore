@@ -1,18 +1,54 @@
+# Data files (large, external)
 *.csv
 *.mp4
 *.h5
-*/__pycache__/
-*/.ipynb_checkpoints/
-*/.vscode/
-*/.idea/
-*/.DS_Store
-*/.pytest
-*.ipynb
+
+# Data directory contents (symlinks to external datasets)
+data/*/
+!data/README.md
+
+# Results directory (generated outputs)
 results/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Virtual environments
 venv/
 env/
 .venv/
 .env/
+ENV/
 
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Configs (local overrides)
+config/local.yaml
+config/*.local.yaml

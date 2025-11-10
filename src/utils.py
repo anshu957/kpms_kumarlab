@@ -1,13 +1,13 @@
 """Utility functions for KeyPoint-MoSeq behavioral analysis pipeline.
 
 This module contains helper functions for data loading, GPU monitoring,
-and logging configuration.
+logging configuration, and config file management.
 
 Usage in Jupyter notebook:
-    from src.utils import load_keypoints_pd, print_gpu_usage, set_up_logging
+    from src.utils import load_keypoints_pd, print_gpu_usage, set_up_logging, load_config
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 import glob
 import numpy as np
 import os
@@ -17,6 +17,7 @@ import subprocess
 import datetime
 import logging
 import pathlib
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -226,3 +227,95 @@ def validate_data_quality(
                 f"{filename}: Low mean confidence: {mean_confidence:.3f}")
 
     return quality_report
+
+
+def load_config(config_path: str = None) -> Dict[str, Any]:
+    """Load configuration from YAML file.
+
+    Args:
+        config_path: Path to config file. If None, loads config/default.yaml
+
+    Returns:
+        Dictionary with configuration parameters
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        yaml.YAMLError: If config file is invalid
+    """
+    if config_path is None:
+        # Default to config/default.yaml in project root
+        project_root = pathlib.Path(__file__).parent.parent
+        config_path = project_root / "config" / "default.yaml"
+
+    config_path = pathlib.Path(config_path)
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        logger.info(f"Loaded configuration from: {config_path}")
+        return config
+    except yaml.YAMLError as e:
+        logger.error(f"Error parsing config file {config_path}: {e}")
+        raise
+
+
+def save_config(config: Dict[str, Any], output_path: pathlib.Path) -> None:
+    """Save configuration to YAML file.
+
+    Args:
+        config: Configuration dictionary
+        output_path: Path to save config file
+
+    Raises:
+        OSError: If file cannot be written
+    """
+    output_path = pathlib.Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(output_path, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"Saved configuration to: {output_path}")
+    except Exception as e:
+        logger.error(f"Error saving config to {output_path}: {e}")
+        raise
+
+
+def merge_config_with_args(config: Dict[str, Any], args: Any) -> Dict[str, Any]:
+    """Merge configuration with command-line arguments.
+
+    CLI arguments override config file values.
+
+    Args:
+        config: Configuration dictionary from YAML file
+        args: Parsed command-line arguments (argparse Namespace)
+
+    Returns:
+        Merged configuration dictionary
+    """
+    merged = config.copy()
+
+    # Map CLI args to config keys
+    arg_to_config = {
+        'kappa': 'kappa',
+        'arhmm_iters': 'arhmm_iters',
+        'full_model_iters': 'full_model_iters',
+        'mixed_map_iters': 'mixed_map_iters',
+        'num_gpus': 'num_gpus',
+        'pose_version': 'pose_version',
+        'anterior_bodyparts': 'anterior_bodyparts',
+        'posterior_bodyparts': 'posterior_bodyparts',
+    }
+
+    # Override config with CLI arguments
+    for arg_name, config_key in arg_to_config.items():
+        if hasattr(args, arg_name):
+            arg_value = getattr(args, arg_name)
+            if arg_value is not None:
+                merged[config_key] = arg_value
+                logger.debug(f"CLI override: {config_key} = {arg_value}")
+
+    return merged

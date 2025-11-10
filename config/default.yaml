@@ -1,0 +1,48 @@
+# KeyPoint-MoSeq Default Configuration
+# Override via CLI arguments or create experiment-specific configs
+
+# Model hyperparameters
+kappa: 0.1                     # Stickiness parameter (higher = longer behavioral bouts)
+arhmm_iters: 10               # AR-HMM iterations
+full_model_iters: 10          # Full model iterations
+mixed_map_iters: 8            # GPU memory management (higher = less memory, slower)
+num_gpus: 1                   # Number of GPUs to use
+
+# Data preprocessing
+pose_version: "v6"            # JABS pose estimation version (v2 or v6)
+validate_output: true         # Validate converted CSV files
+overwrite: false              # Overwrite existing CSV files
+
+# Bodyparts (12-keypoint mouse skeleton)
+bodyparts:
+  - "NOSE_INDEX"
+  - "LEFT_EAR_INDEX"
+  - "RIGHT_EAR_INDEX"
+  - "BASE_NECK_INDEX"
+  - "LEFT_FRONT_PAW_INDEX"
+  - "RIGHT_FRONT_PAW_INDEX"
+  - "CENTER_SPINE_INDEX"
+  - "LEFT_REAR_PAW_INDEX"
+  - "RIGHT_REAR_PAW_INDEX"
+  - "BASE_TAIL_INDEX"
+  - "MID_TAIL_INDEX"
+  - "TIP_TAIL_INDEX"
+
+# Skeleton connections
+skeleton:
+  - ["TIP_TAIL_INDEX", "MID_TAIL_INDEX"]
+  - ["MID_TAIL_INDEX", "BASE_TAIL_INDEX"]
+  - ["BASE_TAIL_INDEX", "RIGHT_REAR_PAW_INDEX"]
+  - ["BASE_TAIL_INDEX", "LEFT_REAR_PAW_INDEX"]
+  - ["BASE_TAIL_INDEX", "CENTER_SPINE_INDEX"]
+  - ["CENTER_SPINE_INDEX", "LEFT_FRONT_PAW_INDEX"]
+  - ["CENTER_SPINE_INDEX", "RIGHT_FRONT_PAW_INDEX"]
+  - ["CENTER_SPINE_INDEX", "BASE_NECK_INDEX"]
+  - ["BASE_NECK_INDEX", "NOSE_INDEX"]
+
+# Orientation bodyparts
+anterior_bodyparts:
+  - "BASE_NECK_INDEX"
+
+posterior_bodyparts:
+  - "BASE_TAIL_INDEX"

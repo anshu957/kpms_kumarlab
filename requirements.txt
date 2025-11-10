@@ -22,6 +22,7 @@ seaborn>=0.11.0
 # Data handling
 h5py>=3.6.0
 tqdm>=4.60.0
+pyyaml>=6.0
 
 # Note: Install keypoint-moseq separately:
 # pip install keypoint-moseq 
