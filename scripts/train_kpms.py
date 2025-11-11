@@ -276,13 +276,13 @@ def main():
     try:
         # Step 1: Load and format data
         logger.info("Step 1/4: Loading and formatting data...")
-        data, metadata, coordinates = load_and_format_data(pose_dir, project_path)
+        data, metadata, coordinates, confidences = load_and_format_data(pose_dir, project_path)
 
         # Validate data quality
         logger.info("Validating data quality...")
         quality_report = validate_data_quality(
             coordinates,
-            metadata.get('confidences', {})
+            confidences
         )
         for filename, metrics in quality_report.items():
             logger.info(f"  {filename}: {metrics['total_frames']} frames, "
