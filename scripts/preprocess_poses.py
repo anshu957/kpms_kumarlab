@@ -27,8 +27,8 @@ project_root = script_dir.parent
 sys.path.insert(0, str(project_root))
 
 # Import project modules
-from src.utils import load_config, set_up_logging
-from src.preprocessing import h5_to_csv_poses
+from src.utils import load_config, set_up_logging, generate_subset_config
+from src.preprocessing import h5_to_csv_poses, create_keypoint_subset, SUBSET_CONFIGS
 
 
 def parse_args():
@@ -75,6 +75,13 @@ def parse_args():
         type=str,
         default=None,
         help='Path to config file (default: config/default.yml)'
+    )
+    parser.add_argument(
+        '--subsets',
+        type=str,
+        choices=['none', '10k', '8k', 'both'],
+        default='none',
+        help='Generate keypoint subsets (10k, 8k, or both)'
     )
 
     return parser.parse_args()
@@ -136,6 +143,65 @@ def main():
         print(f"\nConversion completed!")
         print(f"Converted {len(converted_files)} files")
         print(f"Output: {args.output}")
+
+        # Generate keypoint subsets if requested
+        if args.subsets != 'none':
+            logger.info("="*60)
+            logger.info("Generating keypoint subsets...")
+            logger.info("="*60)
+
+            # Determine which subsets to create
+            subsets_to_create = []
+            if args.subsets == 'both':
+                subsets_to_create = ['10k', '8k']
+            else:
+                subsets_to_create = [args.subsets]
+
+            # Get project root for config generation
+            project_root = pathlib.Path(__file__).parent.parent
+            default_config_path = project_root / "config" / "default.yml"
+
+            for subset_type in subsets_to_create:
+                try:
+                    logger.info(f"\nCreating {subset_type} subset...")
+
+                    # Create subset CSV files
+                    output_base = pathlib.Path(args.output)
+                    subset_dir = output_base.parent / f"{output_base.name}_{subset_type}"
+
+                    subset_files = create_keypoint_subset(
+                        source_dir=args.output,
+                        dest_dir=str(subset_dir),
+                        subset_type=subset_type,
+                        overwrite=overwrite
+                    )
+
+                    logger.info(f"Created {len(subset_files)} {subset_type} CSV files")
+                    print(f"  {subset_type}: {len(subset_files)} files → {subset_dir}")
+
+                    # Generate corresponding config file
+                    config_output_path = project_root / "config" / f"config_{subset_type}.yml"
+                    subset_config = SUBSET_CONFIGS[subset_type]
+
+                    generate_subset_config(
+                        source_config_path=str(default_config_path),
+                        output_config_path=str(config_output_path),
+                        remove_indices=subset_config['remove_indices'],
+                        subset_name=subset_type
+                    )
+
+                    logger.info(f"Generated config file: {config_output_path}")
+                    print(f"  Config: {config_output_path}")
+
+                except Exception as e:
+                    logger.error(f"Failed to create {subset_type} subset: {e}", exc_info=True)
+                    print(f"  ERROR: Failed to create {subset_type} subset")
+                    continue
+
+            logger.info("="*60)
+            logger.info("Subset generation completed!")
+            logger.info("="*60)
+            print("\nSubset generation completed!")
 
     except Exception as e:
         logger.error(f"Preprocessing failed: {e}", exc_info=True)

@@ -403,3 +403,135 @@ def get_pose_file_info(h5_path: str) -> Optional[dict]:
     except Exception as e:
         logger.error(f"Error reading pose file info from {h5_path}: {e}")
         return None
+
+
+# Preset keypoint subset configurations
+SUBSET_CONFIGS = {
+    '10k': {
+        'n_keypoints': 10,
+        'remove_indices': [10, 11],  # MID_TAIL, TIP_TAIL
+        'description': '10-keypoint config (removes mid and tip tail)'
+    },
+    '8k': {
+        'n_keypoints': 8,
+        'remove_indices': [4, 5, 10, 11],  # FRONT_PAWS, MID_TAIL, TIP_TAIL
+        'description': '8-keypoint config (removes front paws and tail tips)'
+    }
+}
+
+
+def create_keypoint_subset(
+    source_dir: str,
+    dest_dir: str,
+    subset_type: str,
+    overwrite: bool = False
+) -> List[str]:
+    """Create keypoint subset from 12-keypoint CSV files.
+
+    Converts 12-keypoint pose CSV files to reduced keypoint configurations
+    by removing specified keypoints while maintaining the x, y, conf triplet format.
+
+    Args:
+        source_dir: Directory containing 12-keypoint CSV files
+        dest_dir: Destination directory for subset CSV files
+        subset_type: Type of subset ('10k' or '8k')
+        overwrite: Whether to overwrite existing files (default: False)
+
+    Returns:
+        List of successfully created subset file paths
+
+    Raises:
+        FileNotFoundError: If source directory doesn't exist
+        ValueError: If invalid subset type or no CSV files found
+    """
+    try:
+        # Validate inputs
+        if not os.path.exists(source_dir):
+            raise FileNotFoundError(f"Source directory not found: {source_dir}")
+
+        if subset_type not in SUBSET_CONFIGS:
+            raise ValueError(
+                f"Invalid subset type: {subset_type}. Must be one of {list(SUBSET_CONFIGS.keys())}")
+
+        config = SUBSET_CONFIGS[subset_type]
+        remove_indices = config['remove_indices']
+        n_target_keypoints = config['n_keypoints']
+
+        # Create destination directory
+        dest_path_obj = pathlib.Path(dest_dir)
+        dest_path_obj.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Creating {config['description']}")
+        logger.info(f"Output directory: {dest_dir}")
+
+        # Find CSV files
+        import glob
+        csv_files = glob.glob(os.path.join(source_dir, "*.csv"))
+
+        if not csv_files:
+            raise ValueError(f"No CSV files found in {source_dir}")
+
+        logger.info(f"Found {len(csv_files)} CSV files to process")
+
+        # Build column indices to keep (exclude remove_indices)
+        cols_to_keep = []
+        for j in range(12):  # 12 keypoints in source
+            if j not in remove_indices:
+                cols_to_keep.extend([j * 3, j * 3 + 1, j * 3 + 2])
+
+        converted_files = []
+        failed_files = []
+
+        for csv_path in tqdm(csv_files, desc=f"Creating {subset_type} subset"):
+            try:
+                filename = os.path.basename(csv_path)
+                dest_csv_path = dest_path_obj / filename
+
+                # Check if file already exists
+                if dest_csv_path.exists() and not overwrite:
+                    logger.debug(f"Skipping existing file: {filename}")
+                    converted_files.append(str(dest_csv_path))
+                    continue
+
+                # Read 12-keypoint CSV
+                df_12k = pd.read_csv(csv_path, header=None)
+
+                # Validate input
+                if df_12k.shape[1] != 36:
+                    raise ValueError(
+                        f"Expected 36 columns (12 keypoints × 3), got {df_12k.shape[1]}")
+
+                # Select subset of columns
+                df_subset = df_12k.iloc[:, cols_to_keep].copy()
+
+                # Reset column indices
+                df_subset.columns = range(n_target_keypoints * 3)
+
+                # Save to CSV (match original format: no header, no index)
+                df_subset.to_csv(dest_csv_path, index=False, header=False)
+
+                converted_files.append(str(dest_csv_path))
+                logger.debug(f"Created subset: {filename}")
+
+            except Exception as e:
+                logger.error(f"Failed to create subset for {filename}: {e}")
+                failed_files.append(filename)
+                continue
+
+        # Summary
+        success_count = len(converted_files)
+        total_count = len(csv_files)
+        logger.info(
+            f"Subset creation complete: {success_count}/{total_count} files successful")
+
+        if failed_files:
+            logger.warning(
+                f"Failed to process {len(failed_files)} files: {failed_files}")
+
+        if success_count == 0:
+            raise RuntimeError("No files were successfully processed")
+
+        return converted_files
+
+    except Exception as e:
+        logger.error(f"Keypoint subset creation failed: {e}")
+        raise RuntimeError(f"Keypoint subset creation failed: {e}") from e

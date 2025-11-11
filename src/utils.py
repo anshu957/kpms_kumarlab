@@ -276,8 +276,21 @@ def save_config(config: Dict[str, Any], output_path: pathlib.Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
+        # Custom YAML dumper to preserve inline list formatting for skeleton
+        class FlowListDumper(yaml.SafeDumper):
+            pass
+
+        def represent_list(dumper, data):
+            # Use flow style (inline brackets) for lists of exactly 2 items (skeleton edges)
+            if len(data) == 2 and all(isinstance(item, str) for item in data):
+                return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
+            # Use block style for other lists
+            return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=False)
+
+        FlowListDumper.add_representer(list, represent_list)
+
         with open(output_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(config, f, Dumper=FlowListDumper, default_flow_style=False, sort_keys=False)
         logger.info(f"Saved configuration to: {output_path}")
     except Exception as e:
         logger.error(f"Error saving config to {output_path}: {e}")
@@ -319,3 +332,113 @@ def merge_config_with_args(config: Dict[str, Any], args: Any) -> Dict[str, Any]:
                 logger.debug(f"CLI override: {config_key} = {arg_value}")
 
     return merged
+
+
+def generate_subset_config(
+    source_config_path: str,
+    output_config_path: str,
+    remove_indices: list,
+    subset_name: str
+) -> None:
+    """Generate config file for keypoint subset.
+
+    Creates a new config file with filtered bodyparts and skeleton connections
+    based on removed keypoint indices.
+
+    Args:
+        source_config_path: Path to source config file (default 12-keypoint config)
+        output_config_path: Path to save subset config file
+        remove_indices: List of keypoint indices to remove (0-based)
+        subset_name: Name of subset (e.g., '10k', '8k')
+
+    Raises:
+        FileNotFoundError: If source config doesn't exist
+        ValueError: If config format is invalid
+    """
+    try:
+        # Load source config
+        source_config = load_config(source_config_path)
+
+        if 'bodyparts' not in source_config:
+            raise ValueError("Source config missing 'bodyparts' field")
+
+        bodyparts = source_config['bodyparts']
+        n_keypoints = len(bodyparts)
+
+        # Filter bodyparts (remove specified indices)
+        filtered_bodyparts = [
+            bp for i, bp in enumerate(bodyparts) if i not in remove_indices
+        ]
+
+        logger.info(
+            f"Filtered bodyparts: {n_keypoints} → {len(filtered_bodyparts)}")
+
+        # Build name-to-index mapping for original bodyparts
+        name_to_idx = {bp: i for i, bp in enumerate(bodyparts)}
+
+        # Filter skeleton connections (remove edges with removed bodyparts)
+        if 'skeleton' in source_config:
+            original_skeleton = source_config['skeleton']
+            filtered_skeleton = []
+
+            for edge in original_skeleton:
+                if len(edge) != 2:
+                    continue
+
+                bp1, bp2 = edge
+                idx1 = name_to_idx.get(bp1)
+                idx2 = name_to_idx.get(bp2)
+
+                # Keep edge only if both bodyparts are retained
+                if idx1 is not None and idx2 is not None:
+                    if idx1 not in remove_indices and idx2 not in remove_indices:
+                        filtered_skeleton.append(edge)
+
+            logger.info(
+                f"Filtered skeleton: {len(original_skeleton)} → {len(filtered_skeleton)} edges")
+        else:
+            filtered_skeleton = []
+
+        # Filter anterior/posterior bodyparts if they exist
+        filtered_anterior = []
+        if 'anterior_bodyparts' in source_config:
+            filtered_anterior = [
+                bp for bp in source_config['anterior_bodyparts']
+                if bp in filtered_bodyparts
+            ]
+
+        filtered_posterior = []
+        if 'posterior_bodyparts' in source_config:
+            filtered_posterior = [
+                bp for bp in source_config['posterior_bodyparts']
+                if bp in filtered_bodyparts
+            ]
+
+        # Create new config
+        subset_config = source_config.copy()
+        subset_config['bodyparts'] = filtered_bodyparts
+        subset_config['skeleton'] = filtered_skeleton
+
+        if filtered_anterior:
+            subset_config['anterior_bodyparts'] = filtered_anterior
+        if filtered_posterior:
+            subset_config['posterior_bodyparts'] = filtered_posterior
+
+        # Add metadata
+        subset_config['_subset_info'] = {
+            'name': subset_name,
+            'n_keypoints': len(filtered_bodyparts),
+            'removed_indices': remove_indices,
+            'source_config': str(source_config_path)
+        }
+
+        # Save subset config
+        output_path = pathlib.Path(output_config_path)
+        save_config(subset_config, output_path)
+
+        logger.info(
+            f"Generated {subset_name} config: {len(filtered_bodyparts)} keypoints")
+
+    except Exception as e:
+        logger.error(f"Failed to generate subset config: {e}")
+        raise
