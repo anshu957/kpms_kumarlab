@@ -52,3 +52,6 @@ htmlcov/
 # Configs (local overrides)
 config/local.yaml
 config/*.local.yaml
+
+# Ignore CLAUDE.md file
+CLAUDE.md
