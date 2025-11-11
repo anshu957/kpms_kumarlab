@@ -143,7 +143,7 @@ def parse_args():
         '--config',
         type=str,
         default=None,
-        help='Path to config file (default: config/default.yaml)'
+        help='Path to config file (default: config/default.yml)'
     )
 
     return parser.parse_args()
@@ -195,7 +195,7 @@ def main():
     # Load configuration and merge with CLI arguments
     try:
         config = load_config(args.config)
-        logger.info(f"Loaded config from: {args.config or 'config/default.yaml'}")
+        logger.info(f"Loaded config from: {args.config or 'config/default.yml'}")
     except FileNotFoundError as e:
         logger.warning(f"Config file not found: {e}")
         logger.warning("Using CLI arguments only")
@@ -205,7 +205,7 @@ def main():
     config = merge_config_with_args(config, args)
 
     # Save used configuration to results directory for reproducibility
-    config_save_path = project_path / "config.yaml"
+    config_save_path = project_path / "config.yml"
     save_config(config, config_save_path)
     logger.info(f"Saved experiment config to: {config_save_path}")
 

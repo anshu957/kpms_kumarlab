@@ -50,8 +50,8 @@ logs/
 htmlcov/
 
 # Configs (local overrides)
-config/local.yaml
-config/*.local.yaml
+config/local.yml
+config/*.local.yml
 
 # Ignore CLAUDE.md file
 CLAUDE.md

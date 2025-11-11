@@ -233,7 +233,7 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
     """Load configuration from YAML file.
 
     Args:
-        config_path: Path to config file. If None, loads config/default.yaml
+        config_path: Path to config file. If None, loads config/default.yml
 
     Returns:
         Dictionary with configuration parameters
@@ -243,9 +243,9 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
         yaml.YAMLError: If config file is invalid
     """
     if config_path is None:
-        # Default to config/default.yaml in project root
+        # Default to config/default.yml in project root
         project_root = pathlib.Path(__file__).parent.parent
-        config_path = project_root / "config" / "default.yaml"
+        config_path = project_root / "config" / "default.yml"
 
     config_path = pathlib.Path(config_path)
 

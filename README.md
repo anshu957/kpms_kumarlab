@@ -57,7 +57,7 @@ python scripts/train_kpms.py \
 
 ```
 results/exp1_run1/
-├── config.yaml          # Exact parameters used (reproducibility)
+├── config.yml           # Exact parameters used (reproducibility)
 ├── results.csv          # Syllable assignments per frame
 ├── checkpoints/         # Trained model
 ├── logs/                # Training logs
@@ -78,9 +78,9 @@ Open `notebooks/main.ipynb` for step-by-step exploration.
 
 ## Configuration
 
-Default parameters: `config/default.yaml`
+Default parameters: `config/default.yml`
 
-CLI arguments override defaults. Used config saved to `results/<experiment>/config.yaml`.
+CLI arguments override defaults. Used config saved to `results/<experiment>/config.yml`.
 
 ## Project Structure
 
