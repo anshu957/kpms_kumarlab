@@ -235,7 +235,7 @@ def generate_plots_and_movies(
     coordinates: Dict[str, np.ndarray],
     project_path: pathlib.Path,
     config_func: Callable[[], Dict[str, Any]] = None
-) -> None:
+) -> Dict[str, bool]:
     """Generate plots and movies from analysis results.
 
     Args:
@@ -245,42 +245,92 @@ def generate_plots_and_movies(
         project_path: Path to the project directory
         config_func: Optional function that returns configuration dictionary
 
-    Raises:
-        RuntimeError: If visualization generation fails
+    Returns:
+        Dictionary with success status for each visualization type
     """
+    logger.info("Starting visualization generation...")
+
+    if config_func is None:
+        def config_func() -> Dict[str, Any]:
+            return kpms.load_config(project_path)
+
+    success_status = {
+        'trajectory_plots': False,
+        'grid_movies': False,
+        'dendrogram': False
+    }
+
+    # Generate trajectory plots
     try:
-        logger.info("Starting visualization generation...")
-
-        if config_func is None:
-            def config_func() -> Dict[str, Any]:
-                return kpms.load_config(project_path)
-
-        # Generate trajectory plots
         logger.info("Generating trajectory plots...")
         kpms.generate_trajectory_plots(
             coordinates, results, project_path, model_name, **config_func()
         )
         logger.info("Trajectory plots generated successfully")
+        success_status['trajectory_plots'] = True
+    except Exception as e:
+        logger.warning(f"Trajectory plots generation failed: {e}")
+        logger.warning("Continuing with other visualizations...")
 
-        # Generate grid movies
+    # Generate grid movies with enhanced diagnostics
+    try:
         logger.info("Generating grid movies...")
+        config = config_func()
+        video_dir = config.get('video_dir', 'Not specified')
+        logger.info(f"Video directory: {video_dir}")
+        logger.info(f"Processing {len(coordinates)} video(s) for grid movies...")
+
+        # Log video keys for diagnostics
+        for key in coordinates.keys():
+            logger.debug(f"  - Video key: {key}")
+
         kpms.generate_grid_movies(
-            results, project_path, model_name, coordinates=coordinates, **config_func()
+            results, project_path, model_name, coordinates=coordinates, **config
         )
         logger.info("Grid movies generated successfully")
+        success_status['grid_movies'] = True
+    except Exception as e:
+        logger.warning(f"Grid movies generation failed: {e}")
 
-        # Generate similarity dendrogram
+        # Enhanced diagnostic logging for video decoding errors
+        if 'error decoding frame' in str(e):
+            logger.warning("Video decoding error detected. This may be due to:")
+            logger.warning("  - Codec incompatibility with vidio library")
+            logger.warning("  - Specific corrupted frames in the video")
+            logger.warning("  - Video file format not fully supported")
+            logger.warning("Consider running scripts/test_videos.py to diagnose video issues")
+
+        logger.warning("Continuing with other visualizations...")
+
+    # Generate similarity dendrogram
+    try:
         logger.info("Generating similarity dendrogram...")
         kpms.plot_similarity_dendrogram(
             coordinates, results, project_path, model_name, **config_func()
         )
         logger.info("Similarity dendrogram generated successfully")
-
-        logger.info("All visualizations generated successfully")
-
+        success_status['dendrogram'] = True
     except Exception as e:
-        logger.error(f"Visualization generation failed: {e}")
-        raise RuntimeError(f"Visualization generation failed: {e}") from e
+        logger.warning(f"Similarity dendrogram generation failed: {e}")
+        logger.warning("Continuing...")
+
+    # Summary
+    successful = [k for k, v in success_status.items() if v]
+    failed = [k for k, v in success_status.items() if not v]
+
+    if successful:
+        logger.info(f"Visualizations completed: {', '.join(successful)}")
+    if failed:
+        logger.warning(f"Visualizations failed: {', '.join(failed)}")
+
+    if all(success_status.values()):
+        logger.info("All visualizations generated successfully")
+    elif any(success_status.values()):
+        logger.warning("Visualization generation completed with some failures")
+    else:
+        logger.error("All visualizations failed to generate")
+
+    return success_status
 
 
 def run_complete_pipeline(
