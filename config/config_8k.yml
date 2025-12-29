@@ -1,0 +1,39 @@
+# KeyPoint-MoSeq Configuration
+# Generated subset configuration
+
+kappa: 0.1
+arhmm_iters: 10
+full_model_iters: 10
+mixed_map_iters: 8
+num_gpus: 1
+pose_version: "v6"
+validate_output: true
+overwrite: false
+bodyparts:
+  - "NOSE_INDEX"
+  - "LEFT_EAR_INDEX"
+  - "RIGHT_EAR_INDEX"
+  - "BASE_NECK_INDEX"
+  - "CENTER_SPINE_INDEX"
+  - "LEFT_REAR_PAW_INDEX"
+  - "RIGHT_REAR_PAW_INDEX"
+  - "BASE_TAIL_INDEX"
+skeleton:
+  - ["BASE_TAIL_INDEX", "RIGHT_REAR_PAW_INDEX"]
+  - ["BASE_TAIL_INDEX", "LEFT_REAR_PAW_INDEX"]
+  - ["BASE_TAIL_INDEX", "CENTER_SPINE_INDEX"]
+  - ["CENTER_SPINE_INDEX", "BASE_NECK_INDEX"]
+  - ["BASE_NECK_INDEX", "NOSE_INDEX"]
+anterior_bodyparts:
+  - "BASE_NECK_INDEX"
+posterior_bodyparts:
+  - "BASE_TAIL_INDEX"
+_subset_info:
+  name: "8k"
+  n_keypoints: 8
+  removed_indices:
+  - 4
+  - 5
+  - 10
+  - 11
+  source_config: "/home/runner/work/kpms_kumarlab/kpms_kumarlab/config/default.yml"
