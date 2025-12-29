@@ -18,6 +18,7 @@ import datetime
 import logging
 import pathlib
 import yaml
+import h5py
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +333,133 @@ def merge_config_with_args(config: Dict[str, Any], args: Any) -> Dict[str, Any]:
                 logger.debug(f"CLI override: {config_key} = {arg_value}")
 
     return merged
+
+
+def log_sample_data(
+    h5_dir: str,
+    csv_dir: str,
+    subset_dirs: Dict[str, str],
+    pose_version: str = "v6",
+    n_samples: int = 3,
+    n_keypoints_to_show: int = 3
+) -> None:
+    """Log sample coordinates from H5, CSV, and subset files for verification.
+    
+    Randomly samples videos and displays coordinates from the first frame
+    to help verify conversion correctness.
+    
+    Args:
+        h5_dir: Directory containing H5 files
+        csv_dir: Directory containing 12-keypoint CSV files
+        subset_dirs: Dictionary mapping subset names to directories (e.g., {'10k': path, '8k': path})
+        pose_version: Version of pose estimation format ("v2" or "v6", default: "v6")
+        n_samples: Number of random videos to sample (default: 3)
+        n_keypoints_to_show: Number of keypoints to show per file (default: 3)
+    """
+    import random
+    
+    logger.info("="*60)
+    logger.info("Sample Data Verification")
+    logger.info("="*60)
+    
+    try:
+        # Find H5 files
+        h5_files = glob.glob(os.path.join(h5_dir, "*.h5"))
+        if not h5_files:
+            logger.warning(f"No H5 files found in {h5_dir}")
+            return
+        
+        # Randomly sample files
+        sample_files = random.sample(h5_files, min(n_samples, len(h5_files)))
+        
+        for h5_path in sample_files:
+            filename = os.path.basename(h5_path)
+            csv_filename = filename.replace(".h5", ".csv")
+            
+            logger.info(f"\n--- Sample: {filename} ---")
+            
+            # Read H5 file
+            try:
+                with h5py.File(h5_path, "r") as h5_file:
+                    if "poseest" not in h5_file:
+                        logger.warning(f"No poseest group in {filename}")
+                        continue
+                    
+                    poseest = h5_file["poseest"]
+                    points = poseest["points"]
+                    confidence = poseest["confidence"]
+                    
+                    logger.info(f"H5 file (frame 0, first {n_keypoints_to_show} keypoints):")
+                    
+                    for i in range(min(n_keypoints_to_show, points.shape[2] if pose_version == "v6" else points.shape[1])):
+                        if pose_version == "v6":
+                            x = points[0, 0, i, 0]
+                            y = points[0, 0, i, 1]
+                            conf = confidence[0, 0, i]
+                        else:  # v2
+                            x = points[0, i, 0]
+                            y = points[0, i, 1]
+                            conf = confidence[0, i]
+                        
+                        logger.info(f"  Keypoint {i}: x={x:.2f}, y={y:.2f}, conf={conf:.3f}")
+            
+            except Exception as e:
+                logger.error(f"Error reading H5 file {filename}: {e}")
+                continue
+            
+            # Read CSV file (12 keypoints)
+            csv_path = os.path.join(csv_dir, csv_filename)
+            if os.path.exists(csv_path):
+                try:
+                    df = pd.read_csv(csv_path, header=None)
+                    logger.info(f"CSV file (frame 0, first {n_keypoints_to_show} keypoints, after x/y swap):")
+                    
+                    for i in range(min(n_keypoints_to_show, 12)):
+                        x = df.iloc[0, 3*i]
+                        y = df.iloc[0, 3*i + 1]
+                        conf = df.iloc[0, 3*i + 2]
+                        logger.info(f"  Keypoint {i}: x={x:.2f}, y={y:.2f}, conf={conf:.3f}")
+                
+                except Exception as e:
+                    logger.error(f"Error reading CSV file {csv_filename}: {e}")
+            else:
+                logger.warning(f"CSV file not found: {csv_filename}")
+            
+            # Read subset files
+            from src.preprocessing import SUBSET_CONFIGS
+            
+            for subset_name, subset_dir in subset_dirs.items():
+                if not os.path.exists(subset_dir):
+                    continue
+                
+                subset_csv_path = os.path.join(subset_dir, csv_filename)
+                if os.path.exists(subset_csv_path):
+                    try:
+                        config = SUBSET_CONFIGS.get(subset_name, {})
+                        remove_indices = config.get('remove_indices', [])
+                        n_keypoints = config.get('n_keypoints', 0)
+                        
+                        df_subset = pd.read_csv(subset_csv_path, header=None)
+                        logger.info(f"{subset_name} subset (frame 0, first {n_keypoints_to_show} keypoints):")
+                        logger.info(f"  Removed keypoint indices: {remove_indices}")
+                        
+                        for i in range(min(n_keypoints_to_show, n_keypoints)):
+                            x = df_subset.iloc[0, 3*i]
+                            y = df_subset.iloc[0, 3*i + 1]
+                            conf = df_subset.iloc[0, 3*i + 2]
+                            logger.info(f"  Keypoint {i}: x={x:.2f}, y={y:.2f}, conf={conf:.3f}")
+                    
+                    except Exception as e:
+                        logger.error(f"Error reading {subset_name} subset file: {e}")
+                else:
+                    logger.warning(f"{subset_name} subset file not found: {csv_filename}")
+        
+        logger.info("="*60)
+        logger.info("Sample data verification complete")
+        logger.info("="*60)
+    
+    except Exception as e:
+        logger.error(f"Error in log_sample_data: {e}")
 
 
 def generate_subset_config(
