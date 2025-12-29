@@ -270,7 +270,7 @@ def save_config(config: Dict[str, Any], output_path: pathlib.Path) -> None:
     Args:
         config: Configuration dictionary
         output_path: Path to save config file
-
+        
     Raises:
         OSError: If file cannot be written
     """
@@ -278,21 +278,62 @@ def save_config(config: Dict[str, Any], output_path: pathlib.Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Custom YAML dumper to preserve inline list formatting for skeleton
-        class FlowListDumper(yaml.SafeDumper):
+        # Custom YAML dumper to preserve formatting similar to default.yml
+        class ConfigDumper(yaml.SafeDumper):
             pass
-
+        
+        def represent_str(dumper, data):
+            # Use quoted strings only for string values that need it
+            if '\n' in data or data == '':
+                return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+            # Quote strings that look like bodypart names or version strings
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+        
         def represent_list(dumper, data):
             # Use flow style (inline brackets) for lists of exactly 2 items (skeleton edges)
             if len(data) == 2 and all(isinstance(item, str) for item in data):
                 return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
             # Use block style for other lists
             return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=False)
-
-        FlowListDumper.add_representer(list, represent_list)
+        
+        ConfigDumper.add_representer(str, represent_str)
+        ConfigDumper.add_representer(list, represent_list)
 
         with open(output_path, 'w') as f:
-            yaml.dump(config, f, Dumper=FlowListDumper, default_flow_style=False, sort_keys=False)
+            # Add header comment
+            f.write("# KeyPoint-MoSeq Configuration\n")
+            f.write("# Generated subset configuration\n\n")
+            
+            # Dump the configuration with proper indentation
+            yaml_content = yaml.dump(config, Dumper=ConfigDumper, 
+                     default_flow_style=False, sort_keys=False, 
+                     indent=2, allow_unicode=True)
+            
+            # Post-process to improve formatting - remove quotes from keys and adjust list indentation
+            lines = yaml_content.split('\n')
+            formatted_lines = []
+            
+            for line in lines:
+                # Remove quotes from keys (but keep quotes on values)
+                if ':' in line and not line.strip().startswith('-'):
+                    parts = line.split(':', 1)
+                    if len(parts) == 2:
+                        key_part = parts[0].replace('"', '').replace("'", '')
+                        value_part = parts[1]
+                        line = key_part + ':' + value_part
+                
+                # Adjust list indentation to match default.yml (add extra 2 spaces)
+                if line.startswith('- '):
+                    # Top-level list item
+                    line = '  ' + line
+                elif line.startswith('  - ') and not line.startswith('    '):
+                    # Already indented list item, ensure consistent spacing
+                    pass
+                
+                formatted_lines.append(line)
+            
+            f.write('\n'.join(formatted_lines))
+        
         logger.info(f"Saved configuration to: {output_path}")
     except Exception as e:
         logger.error(f"Error saving config to {output_path}: {e}")

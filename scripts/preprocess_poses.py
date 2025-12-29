@@ -189,7 +189,8 @@ def main():
                         source_dir=args.output,
                         dest_dir=str(subset_dir),
                         subset_type=subset_type,
-                        overwrite=overwrite
+                        overwrite=overwrite,
+                        n_jobs=args.n_jobs
                     )
 
                     logger.info(f"Created {len(subset_files)} {subset_type} CSV files")

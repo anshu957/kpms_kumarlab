@@ -425,7 +425,8 @@ def create_keypoint_subset(
     source_dir: str,
     dest_dir: str,
     subset_type: str,
-    overwrite: bool = False
+    overwrite: bool = False,
+    n_jobs: Optional[int] = None
 ) -> List[str]:
     """Create keypoint subset from 12-keypoint CSV files.
 
@@ -437,6 +438,7 @@ def create_keypoint_subset(
         dest_dir: Destination directory for subset CSV files
         subset_type: Type of subset ('10k' or '8k')
         overwrite: Whether to overwrite existing files (default: False)
+        n_jobs: Number of parallel workers (default: None for sequential processing)
 
     Returns:
         List of successfully created subset file paths
@@ -445,6 +447,12 @@ def create_keypoint_subset(
         FileNotFoundError: If source directory doesn't exist
         ValueError: If invalid subset type or no CSV files found
     """
+    # Use parallel version if n_jobs is specified
+    if n_jobs is not None:
+        return create_keypoint_subset_parallel(
+            source_dir, dest_dir, subset_type, overwrite, n_jobs
+        )
+    
     try:
         # Validate inputs
         if not os.path.exists(source_dir):
@@ -535,6 +543,164 @@ def create_keypoint_subset(
     except Exception as e:
         logger.error(f"Keypoint subset creation failed: {e}")
         raise RuntimeError(f"Keypoint subset creation failed: {e}") from e
+
+
+def _convert_single_csv_for_subset_parallel(args: Tuple) -> Tuple[str, bool, Optional[str]]:
+    """Worker function for parallel subset creation.
+    
+    Args:
+        args: Tuple of (csv_path, dest_csv_path, cols_to_keep, n_target_keypoints)
+    
+    Returns:
+        Tuple of (filename, success, error_message)
+    """
+    csv_path, dest_csv_path, cols_to_keep, n_target_keypoints = args
+    filename = os.path.basename(csv_path)
+    
+    try:
+        # Read 12-keypoint CSV
+        df_12k = pd.read_csv(csv_path, header=None)
+        
+        # Validate input
+        if df_12k.shape[1] != 36:
+            return (filename, False, f"Expected 36 columns, got {df_12k.shape[1]}")
+        
+        # Select subset of columns
+        df_subset = df_12k.iloc[:, cols_to_keep].copy()
+        
+        # Reset column indices
+        df_subset.columns = range(n_target_keypoints * 3)
+        
+        # Save to CSV
+        df_subset.to_csv(dest_csv_path, index=False, header=False)
+        
+        return (filename, True, None)
+        
+    except Exception as e:
+        return (filename, False, str(e))
+
+
+def create_keypoint_subset_parallel(
+    source_dir: str,
+    dest_dir: str,
+    subset_type: str,
+    overwrite: bool = False,
+    n_jobs: Optional[int] = None
+) -> List[str]:
+    """Create keypoint subset from 12-keypoint CSV files using parallel processing.
+    
+    This is a parallel version of create_keypoint_subset() that uses multiprocessing
+    to significantly speed up subset creation on multi-core systems.
+    
+    Args:
+        source_dir: Directory containing 12-keypoint CSV files
+        dest_dir: Destination directory for subset CSV files
+        subset_type: Type of subset ('10k' or '8k')
+        overwrite: Whether to overwrite existing files (default: False)
+        n_jobs: Number of parallel workers (default: CPU count)
+    
+    Returns:
+        List of successfully created subset file paths
+    
+    Raises:
+        FileNotFoundError: If source directory doesn't exist
+        ValueError: If invalid subset type or no CSV files found
+        RuntimeError: If subset creation fails
+    """
+    try:
+        # Validate inputs
+        if not os.path.exists(source_dir):
+            raise FileNotFoundError(f"Source directory not found: {source_dir}")
+        
+        if subset_type not in SUBSET_CONFIGS:
+            raise ValueError(
+                f"Invalid subset type: {subset_type}. Must be one of {list(SUBSET_CONFIGS.keys())}")
+        
+        config = SUBSET_CONFIGS[subset_type]
+        remove_indices = config['remove_indices']
+        n_target_keypoints = config['n_keypoints']
+        
+        # Create destination directory
+        dest_path_obj = pathlib.Path(dest_dir)
+        dest_path_obj.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Creating {config['description']}")
+        logger.info(f"Output directory: {dest_dir}")
+        
+        # Find CSV files
+        csv_files = glob.glob(os.path.join(source_dir, "*.csv"))
+        
+        if not csv_files:
+            raise ValueError(f"No CSV files found in {source_dir}")
+        
+        logger.info(f"Found {len(csv_files)} CSV files to process")
+        
+        # Determine number of workers
+        if n_jobs is None:
+            n_jobs = cpu_count()
+        logger.info(f"Using {n_jobs} parallel workers")
+        
+        # Build column indices to keep (exclude remove_indices)
+        cols_to_keep = []
+        for j in range(12):  # 12 keypoints in source
+            if j not in remove_indices:
+                cols_to_keep.extend([j * 3, j * 3 + 1, j * 3 + 2])
+        
+        # Prepare arguments for parallel processing
+        tasks = []
+        converted_files = []
+        
+        for csv_path in csv_files:
+            filename = os.path.basename(csv_path)
+            dest_csv_path = dest_path_obj / filename
+            
+            # Check if file already exists and overwrite flag
+            if dest_csv_path.exists() and not overwrite:
+                logger.debug(f"Skipping existing file: {filename}")
+                converted_files.append(str(dest_csv_path))
+                continue
+            
+            tasks.append((csv_path, str(dest_csv_path), cols_to_keep, n_target_keypoints))
+        
+        # Process files in parallel
+        failed_files = []
+        
+        if tasks:
+            with Pool(processes=n_jobs) as pool:
+                results = list(tqdm(
+                    pool.imap(_convert_single_csv_for_subset_parallel, tasks),
+                    total=len(tasks),
+                    desc=f"Creating {subset_type} subset (parallel)"
+                ))
+            
+            # Collect results
+            for filename, success, error_msg in results:
+                if success:
+                    dest_csv_path = dest_path_obj / filename
+                    converted_files.append(str(dest_csv_path))
+                    logger.debug(f"Created subset: {filename}")
+                else:
+                    failed_files.append(filename)
+                    if error_msg:
+                        logger.error(f"Failed to create subset for {filename}: {error_msg}")
+        
+        # Summary
+        success_count = len(converted_files)
+        total_count = len(csv_files)
+        logger.info(
+            f"Subset creation complete: {success_count}/{total_count} files successful")
+        
+        if failed_files:
+            logger.warning(
+                f"Failed to process {len(failed_files)} files: {failed_files}")
+        
+        if success_count == 0:
+            raise RuntimeError("No files were successfully processed")
+        
+        return converted_files
+    
+    except Exception as e:
+        logger.error(f"Parallel keypoint subset creation failed: {e}")
+        raise RuntimeError(f"Parallel keypoint subset creation failed: {e}") from e
 
 
 def _convert_single_h5_file_for_parallel(args: Tuple) -> Tuple[str, bool, Optional[str]]:
