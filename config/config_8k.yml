@@ -33,4 +33,4 @@ _subset_info:
   - 5
   - 10
   - 11
-  source_config: config/default.yml
+  source_config: /home/runner/work/kpms_kumarlab/kpms_kumarlab/config/default.yml
