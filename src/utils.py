@@ -8,18 +8,18 @@ Usage in Jupyter notebook:
 """
 
 from typing import Dict, Tuple, Any
+import datetime
 import glob
+import h5py
+import logging
 import numpy as np
 import os
-import tqdm
 import pandas as pd
-import subprocess
-import datetime
-import logging
 import pathlib
-import yaml
-import h5py
 import random
+import subprocess
+import tqdm
+import yaml
 
 logger = logging.getLogger(__name__)
 

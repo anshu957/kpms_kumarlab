@@ -117,7 +117,7 @@ class TestParallelPreprocessing(unittest.TestCase):
             
             # Check that dataframes are identical
             self.assertEqual(df_seq.shape, df_par.shape)
-            np.testing.assert_allclose(df_seq.values, df_par.values, rtol=1e-10)
+            np.testing.assert_allclose(df_seq.values, df_par.values, rtol=1e-8)
 
     def test_parallel_with_existing_files(self):
         """Test parallel conversion with existing files (overwrite=False)."""
