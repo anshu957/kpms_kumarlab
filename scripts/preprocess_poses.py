@@ -244,6 +244,7 @@ def main():
                 h5_dir=args.input,
                 csv_dir=args.output,
                 subset_dirs=subset_dirs,
+                subset_configs=SUBSET_CONFIGS,
                 pose_version=pose_version,
                 n_samples=args.n_samples
             )

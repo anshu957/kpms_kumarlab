@@ -19,6 +19,7 @@ import logging
 import pathlib
 import yaml
 import h5py
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -339,6 +340,7 @@ def log_sample_data(
     h5_dir: str,
     csv_dir: str,
     subset_dirs: Dict[str, str],
+    subset_configs: Dict[str, Dict[str, Any]] = None,
     pose_version: str = "v6",
     n_samples: int = 3,
     n_keypoints_to_show: int = 3
@@ -352,12 +354,11 @@ def log_sample_data(
         h5_dir: Directory containing H5 files
         csv_dir: Directory containing 12-keypoint CSV files
         subset_dirs: Dictionary mapping subset names to directories (e.g., {'10k': path, '8k': path})
+        subset_configs: Dictionary mapping subset names to their configurations (optional)
         pose_version: Version of pose estimation format ("v2" or "v6", default: "v6")
         n_samples: Number of random videos to sample (default: 3)
         n_keypoints_to_show: Number of keypoints to show per file (default: 3)
     """
-    import random
-    
     logger.info("="*60)
     logger.info("Sample Data Verification")
     logger.info("="*60)
@@ -426,7 +427,8 @@ def log_sample_data(
                 logger.warning(f"CSV file not found: {csv_filename}")
             
             # Read subset files
-            from src.preprocessing import SUBSET_CONFIGS
+            if subset_configs is None:
+                subset_configs = {}
             
             for subset_name, subset_dir in subset_dirs.items():
                 if not os.path.exists(subset_dir):
@@ -435,7 +437,7 @@ def log_sample_data(
                 subset_csv_path = os.path.join(subset_dir, csv_filename)
                 if os.path.exists(subset_csv_path):
                     try:
-                        config = SUBSET_CONFIGS.get(subset_name, {})
+                        config = subset_configs.get(subset_name, {})
                         remove_indices = config.get('remove_indices', [])
                         n_keypoints = config.get('n_keypoints', 0)
                         

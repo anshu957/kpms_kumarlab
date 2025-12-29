@@ -10,6 +10,8 @@ import tempfile
 import pathlib
 import h5py
 import sys
+import shutil
+import pandas as pd
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -33,7 +35,6 @@ class TestParallelPreprocessing(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test fixtures."""
-        import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _create_mock_h5_file(self, filename, n_frames=10, n_keypoints=12, pose_version="v6"):
@@ -107,7 +108,6 @@ class TestParallelPreprocessing(unittest.TestCase):
         self.assertEqual(len(sequential_files), len(parallel_files))
         
         # Compare file contents
-        import pandas as pd
         for i in range(3):
             csv_seq = os.path.join(self.csv_dir, f"test_{i}.csv")
             csv_par = os.path.join(self.csv_parallel_dir, f"test_{i}.csv")

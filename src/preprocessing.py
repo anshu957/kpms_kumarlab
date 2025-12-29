@@ -9,6 +9,7 @@ import pandas as pd
 import h5py
 import numpy as np
 import os
+import glob
 import logging
 import pathlib
 from tqdm import tqdm
@@ -59,7 +60,6 @@ def h5_to_csv_poses(
         logger.info(f"Created destination directory: {dest_path}")
 
         # Find H5 files
-        import glob
         h5_files = glob.glob(os.path.join(folder_path, file_pattern))
 
         if not h5_files:
@@ -465,7 +465,6 @@ def create_keypoint_subset(
         logger.info(f"Output directory: {dest_dir}")
 
         # Find CSV files
-        import glob
         csv_files = glob.glob(os.path.join(source_dir, "*.csv"))
 
         if not csv_files:
@@ -609,7 +608,6 @@ def h5_to_csv_poses_parallel(
         logger.info(f"Created destination directory: {dest_path}")
         
         # Find H5 files
-        import glob
         h5_files = glob.glob(os.path.join(folder_path, file_pattern))
         
         if not h5_files:
