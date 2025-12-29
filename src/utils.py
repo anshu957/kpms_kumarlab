@@ -8,15 +8,17 @@ Usage in Jupyter notebook:
 """
 
 from typing import Dict, Tuple, Any
+import datetime
 import glob
+import h5py
+import logging
 import numpy as np
 import os
-import tqdm
 import pandas as pd
-import subprocess
-import datetime
-import logging
 import pathlib
+import random
+import subprocess
+import tqdm
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -268,7 +270,7 @@ def save_config(config: Dict[str, Any], output_path: pathlib.Path) -> None:
     Args:
         config: Configuration dictionary
         output_path: Path to save config file
-
+        
     Raises:
         OSError: If file cannot be written
     """
@@ -276,21 +278,62 @@ def save_config(config: Dict[str, Any], output_path: pathlib.Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Custom YAML dumper to preserve inline list formatting for skeleton
-        class FlowListDumper(yaml.SafeDumper):
+        # Custom YAML dumper to preserve formatting similar to default.yml
+        class ConfigDumper(yaml.SafeDumper):
             pass
-
+        
+        def represent_str(dumper, data):
+            # Use quoted strings only for string values that need it
+            if '\n' in data or data == '':
+                return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+            # Quote strings that look like bodypart names or version strings
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+        
         def represent_list(dumper, data):
             # Use flow style (inline brackets) for lists of exactly 2 items (skeleton edges)
             if len(data) == 2 and all(isinstance(item, str) for item in data):
                 return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
             # Use block style for other lists
             return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=False)
-
-        FlowListDumper.add_representer(list, represent_list)
+        
+        ConfigDumper.add_representer(str, represent_str)
+        ConfigDumper.add_representer(list, represent_list)
 
         with open(output_path, 'w') as f:
-            yaml.dump(config, f, Dumper=FlowListDumper, default_flow_style=False, sort_keys=False)
+            # Add header comment
+            f.write("# KeyPoint-MoSeq Configuration\n")
+            f.write("# Generated subset configuration\n\n")
+            
+            # Dump the configuration with proper indentation
+            yaml_content = yaml.dump(config, Dumper=ConfigDumper, 
+                     default_flow_style=False, sort_keys=False, 
+                     indent=2, allow_unicode=True)
+            
+            # Post-process to improve formatting - remove quotes from keys and adjust list indentation
+            lines = yaml_content.split('\n')
+            formatted_lines = []
+            
+            for line in lines:
+                # Remove quotes from keys (but keep quotes on values)
+                if ':' in line and not line.strip().startswith('-'):
+                    parts = line.split(':', 1)
+                    if len(parts) == 2:
+                        key_part = parts[0].replace('"', '').replace("'", '')
+                        value_part = parts[1]
+                        line = key_part + ':' + value_part
+                
+                # Adjust list indentation to match default.yml (add extra 2 spaces)
+                if line.startswith('- '):
+                    # Top-level list item
+                    line = '  ' + line
+                elif line.startswith('  - ') and not line.startswith('    '):
+                    # Already indented list item, ensure consistent spacing
+                    pass
+                
+                formatted_lines.append(line)
+            
+            f.write('\n'.join(formatted_lines))
+        
         logger.info(f"Saved configuration to: {output_path}")
     except Exception as e:
         logger.error(f"Error saving config to {output_path}: {e}")
@@ -332,6 +375,134 @@ def merge_config_with_args(config: Dict[str, Any], args: Any) -> Dict[str, Any]:
                 logger.debug(f"CLI override: {config_key} = {arg_value}")
 
     return merged
+
+
+def log_sample_data(
+    h5_dir: str,
+    csv_dir: str,
+    subset_dirs: Dict[str, str],
+    subset_configs: Dict[str, Dict[str, Any]] = None,
+    pose_version: str = "v6",
+    n_samples: int = 3,
+    n_keypoints_to_show: int = 3
+) -> None:
+    """Log sample coordinates from H5, CSV, and subset files for verification.
+    
+    Randomly samples videos and displays coordinates from the first frame
+    to help verify conversion correctness.
+    
+    Args:
+        h5_dir: Directory containing H5 files
+        csv_dir: Directory containing 12-keypoint CSV files
+        subset_dirs: Dictionary mapping subset names to directories (e.g., {'10k': path, '8k': path})
+        subset_configs: Dictionary mapping subset names to their configurations (optional)
+        pose_version: Version of pose estimation format ("v2" or "v6", default: "v6")
+        n_samples: Number of random videos to sample (default: 3)
+        n_keypoints_to_show: Number of keypoints to show per file (default: 3)
+    """
+    logger.info("="*60)
+    logger.info("Sample Data Verification")
+    logger.info("="*60)
+    
+    try:
+        # Find H5 files
+        h5_files = glob.glob(os.path.join(h5_dir, "*.h5"))
+        if not h5_files:
+            logger.warning(f"No H5 files found in {h5_dir}")
+            return
+        
+        # Randomly sample files
+        sample_files = random.sample(h5_files, min(n_samples, len(h5_files)))
+        
+        for h5_path in sample_files:
+            filename = os.path.basename(h5_path)
+            csv_filename = filename.replace(".h5", ".csv")
+            
+            logger.info(f"\n--- Sample: {filename} ---")
+            
+            # Read H5 file
+            try:
+                with h5py.File(h5_path, "r") as h5_file:
+                    if "poseest" not in h5_file:
+                        logger.warning(f"No poseest group in {filename}")
+                        continue
+                    
+                    poseest = h5_file["poseest"]
+                    points = poseest["points"]
+                    confidence = poseest["confidence"]
+                    
+                    logger.info(f"H5 file (frame 0, first {n_keypoints_to_show} keypoints):")
+                    
+                    for i in range(min(n_keypoints_to_show, points.shape[2] if pose_version == "v6" else points.shape[1])):
+                        if pose_version == "v6":
+                            x = points[0, 0, i, 0]
+                            y = points[0, 0, i, 1]
+                            conf = confidence[0, 0, i]
+                        else:  # v2
+                            x = points[0, i, 0]
+                            y = points[0, i, 1]
+                            conf = confidence[0, i]
+                        
+                        logger.info(f"  Keypoint {i}: x={x:.2f}, y={y:.2f}, conf={conf:.3f}")
+            
+            except Exception as e:
+                logger.error(f"Error reading H5 file {filename}: {e}")
+                continue
+            
+            # Read CSV file (12 keypoints)
+            csv_path = os.path.join(csv_dir, csv_filename)
+            if os.path.exists(csv_path):
+                try:
+                    df = pd.read_csv(csv_path, header=None)
+                    logger.info(f"CSV file (frame 0, first {n_keypoints_to_show} keypoints, after x/y swap):")
+                    
+                    for i in range(min(n_keypoints_to_show, 12)):
+                        x = df.iloc[0, 3*i]
+                        y = df.iloc[0, 3*i + 1]
+                        conf = df.iloc[0, 3*i + 2]
+                        logger.info(f"  Keypoint {i}: x={x:.2f}, y={y:.2f}, conf={conf:.3f}")
+                
+                except Exception as e:
+                    logger.error(f"Error reading CSV file {csv_filename}: {e}")
+            else:
+                logger.warning(f"CSV file not found: {csv_filename}")
+            
+            # Read subset files
+            if subset_configs is None:
+                subset_configs = {}
+            
+            for subset_name, subset_dir in subset_dirs.items():
+                if not os.path.exists(subset_dir):
+                    continue
+                
+                subset_csv_path = os.path.join(subset_dir, csv_filename)
+                if os.path.exists(subset_csv_path):
+                    try:
+                        config = subset_configs.get(subset_name, {})
+                        remove_indices = config.get('remove_indices', [])
+                        n_keypoints = config.get('n_keypoints', 0)
+                        
+                        df_subset = pd.read_csv(subset_csv_path, header=None)
+                        logger.info(f"{subset_name} subset (frame 0, first {n_keypoints_to_show} keypoints):")
+                        logger.info(f"  Removed keypoint indices: {remove_indices}")
+                        
+                        for i in range(min(n_keypoints_to_show, n_keypoints)):
+                            x = df_subset.iloc[0, 3*i]
+                            y = df_subset.iloc[0, 3*i + 1]
+                            conf = df_subset.iloc[0, 3*i + 2]
+                            logger.info(f"  Keypoint {i}: x={x:.2f}, y={y:.2f}, conf={conf:.3f}")
+                    
+                    except Exception as e:
+                        logger.error(f"Error reading {subset_name} subset file: {e}")
+                else:
+                    logger.warning(f"{subset_name} subset file not found: {csv_filename}")
+        
+        logger.info("="*60)
+        logger.info("Sample data verification complete")
+        logger.info("="*60)
+    
+    except Exception as e:
+        logger.error(f"Error in log_sample_data: {e}")
 
 
 def generate_subset_config(
