@@ -57,7 +57,7 @@ def load_keypoints_pd(
         try:
             # Read the CSV file in chunks to handle large files
             chunk_iterator = pd.read_csv(
-                filepath, skiprows=1, header=None, chunksize=chunk_size
+                filepath, header=None, chunksize=chunk_size
             )
         except Exception as e:
             logger.error(f"Error reading {filepath}: {e}")
