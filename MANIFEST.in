@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include config *.yml
+recursive-include scripts *.py *.sh
+recursive-include src *.py
+recursive-include examples *.csv *.mp4
+recursive-exclude tests *
+recursive-exclude notebooks *
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store

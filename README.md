@@ -6,12 +6,30 @@ Unsupervised behavioral analysis using KeyPoint-MoSeq AR-HMM models.
 
 ### 1. Installation
 
+#### Method 1: Install from source (recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/anshu957/kpms_kumarlab.git
+cd kpms_kumarlab
+
+# Create conda environment
+conda create -n kpms python=3.9
+conda activate kpms
+
+# Install the package and all dependencies
+pip install -e .
+```
+
+#### Method 2: Install dependencies only
+
 ```bash
 conda create -n kpms python=3.9
 conda activate kpms
 pip install -r requirements.txt
-pip install keypoint-moseq
 ```
+
+**Note:** The package is now properly configured with `setup.py` and `pyproject.toml`, making it easy to install and deploy.
 
 ### 2. Data Organization
 

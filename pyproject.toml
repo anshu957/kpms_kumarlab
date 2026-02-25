@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kpms-kumarlab"
+version = "0.1.0"
+description = "Unsupervised behavioral analysis using KeyPoint-MoSeq AR-HMM models"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+keywords = ["behavioral analysis", "keypoint tracking", "pose estimation", "machine learning"]
+authors = [
+  {name = "Kumar Lab"}
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+  "numpy>=1.21.0",
+  "pandas>=1.3.0",
+  "scipy>=1.7.0",
+  "jax>=0.3.0",
+  "jaxlib>=0.3.0",
+  "matplotlib>=3.5.0",
+  "seaborn>=0.11.0",
+  "h5py>=3.6.0",
+  "tqdm>=4.60.0",
+  "pyyaml>=6.0",
+  "keypoint-moseq>=0.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "black>=22.0",
+  "flake8>=4.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/anshu957/kpms_kumarlab"
+"Bug Reports" = "https://github.com/anshu957/kpms_kumarlab/issues"
+"Source" = "https://github.com/anshu957/kpms_kumarlab"
+
+[project.scripts]
+kpms-train = "scripts.train_kpms:main"
+kpms-preprocess = "scripts.preprocess_poses:main"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "notebooks*", "examples*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

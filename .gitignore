@@ -17,6 +17,11 @@ __pycache__/
 *.pyd
 .Python
 *.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
 
 # Jupyter
 .ipynb_checkpoints/
