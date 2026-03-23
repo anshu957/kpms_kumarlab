@@ -52,3 +52,6 @@ htmlcov/
 # Configs (local overrides)
 config/local.yaml
 config/*.local.yaml
+
+# GitHub Copilot workspace instructions (repo-local, not for VCS)
+.github/
