@@ -1,16 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=kpms_train          # Job name
-#SBATCH --partition=gpu                # Partition (queue) - adjust for your cluster
+#SBATCH --job-name=kpms_train_combined_OFA          # Job name
+#SBATCH --partition=gpu_a100           # Partition 
+#SBATCH --qos=gpu_training             # QoS 
 #SBATCH --nodes=1                      # Number of nodes
 #SBATCH --ntasks=1                     # Number of tasks
-#SBATCH --cpus-per-task=4              # CPU cores per task
+#SBATCH --cpus-per-task=8             # CPU cores per task
 #SBATCH --gres=gpu:1                   # Number of GPUs (change to gpu:2 for multi-GPU)
-#SBATCH --mem=32G                      # Memory per node
-#SBATCH --time=24:00:00                # Time limit (HH:MM:SS)
+#SBATCH --mem=124G                      # Memory per node
+#SBATCH --time=11:00:00                # Time limit (HH:MM:SS)
 #SBATCH --output=logs/kpms_%j.out      # Standard output log (%j = job ID)
 #SBATCH --error=logs/kpms_%j.err       # Standard error log
-#SBATCH --mail-type=END,FAIL           # Email notifications
-#SBATCH --mail-user=your.email@institution.edu  # Your email address
 
 # ============================================================================
 # KeyPoint-MoSeq SLURM Job Submission Script
@@ -36,21 +35,10 @@ echo "Node: $SLURM_NODELIST"
 echo "Date: $(date)"
 echo "=========================================="
 
-# Load required modules (adjust for your HPC cluster)
-# Uncomment and modify based on your cluster's module system
-# module load cuda/12.0
-# module load python/3.9
-# module load gcc/11.2.0
-
-# Activate conda environment
-# Adjust the path to your conda installation
-source ~/miniconda3/etc/profile.d/conda.sh  # Or anaconda3
-conda activate kpms
 
 # Verify environment
 echo "Python: $(which python)"
 echo "Python version: $(python --version)"
-echo "Conda environment: $CONDA_DEFAULT_ENV"
 
 # Check GPU availability
 echo "=========================================="
@@ -64,19 +52,26 @@ echo "=========================================="
 # ============================================================================
 
 # Project paths
-PROJECT_ROOT="/path/to/kpms_kumarlab"  # UPDATE THIS
-POSE_DIR="${PROJECT_ROOT}/examples/jabs600_v2/poses"
-VIDEO_DIR="${PROJECT_ROOT}/examples/jabs600_v2/videos"
-PROJECT_PATH="${PROJECT_ROOT}/results/experiment_${SLURM_JOB_ID}"
+PROJECT_ROOT="/flashscratch/chouda/kpms_combined_OFA/kpms_kumarlab"  
+POSE_DIR="${PROJECT_ROOT}/data/combined_OFA/poses_csv_10k"
+VIDEO_DIR="${PROJECT_ROOT}/data/combined_OFA/videos"
+#POSE_DIR="${PROJECT_ROOT}/examples/jabs600_v2/poses_csv"
+#VIDEO_DIR="${PROJECT_ROOT}/examples/jabs600_v2/videos"
 
 # Model hyperparameters
-KAPPA=0.1                    # Stickiness parameter
-ARHMM_ITERS=10              # AR-HMM iterations
-FULL_MODEL_ITERS=10         # Full model iterations
+KAPPA=1e6                    # Stickiness parameter
+ARHMM_ITERS=50              # AR-HMM iterations
+FULL_MODEL_ITERS=300         # Full model iterations
 MIXED_MAP_ITERS=8           # GPU memory management
 
 # GPU configuration
 NUM_GPUS=1                   # Number of GPUs to use
+
+PROJECT_PATH="${PROJECT_ROOT}/results/combined_OFA_kappa_${KAPPA}"
+#PROJECT_PATH="${PROJECT_ROOT}/results/test_${KAPPA}"
+
+CONFIG_10k="${PROJECT_ROOT}/config/config_10k.yml"
+
 
 # ============================================================================
 # SINGLE JOB EXECUTION
@@ -91,6 +86,7 @@ echo "Pose directory: $POSE_DIR"
 echo "Project path: $PROJECT_PATH"
 echo "Video directory: $VIDEO_DIR"
 echo "Kappa: $KAPPA"
+echo "Config: $CONFIG_10k"
 echo "=========================================="
 
 python scripts/train_kpms.py \
@@ -101,7 +97,9 @@ python scripts/train_kpms.py \
     --arhmm-iters "$ARHMM_ITERS" \
     --full-model-iters "$FULL_MODEL_ITERS" \
     --mixed-map-iters "$MIXED_MAP_ITERS" \
-    --num-gpus "$NUM_GPUS"
+    --num-gpus "$NUM_GPUS"\
+    --config "$CONFIG_10k"
+   
 
 # Check exit status
 if [ $? -eq 0 ]; then
@@ -163,5 +161,3 @@ echo "=========================================="
 # Optional: Copy results to backup location
 # rsync -av "$PROJECT_PATH" /backup/location/
 
-# Optional: Send custom notification
-# echo "KPMS training completed for job $SLURM_JOB_ID" | mail -s "Job Complete" your.email@institution.edu

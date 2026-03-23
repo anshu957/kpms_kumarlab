@@ -13,7 +13,8 @@ Example:
         --input data/experiment_1/raw_h5/ \
         --output data/experiment_1/processed_csv/ \
         --pose-version v6 \
-        --validate
+        --validate \
+        --n-jobs 8
 """
 
 import sys
@@ -27,8 +28,8 @@ project_root = script_dir.parent
 sys.path.insert(0, str(project_root))
 
 # Import project modules
-from src.utils import load_config, set_up_logging
-from src.preprocessing import h5_to_csv_poses
+from src.utils import load_config, set_up_logging, generate_subset_config, log_sample_data
+from src.preprocessing import h5_to_csv_poses_parallel, create_keypoint_subset, SUBSET_CONFIGS
 
 
 def parse_args():
@@ -74,7 +75,26 @@ def parse_args():
         '--config',
         type=str,
         default=None,
-        help='Path to config file (default: config/default.yaml)'
+        help='Path to config file (default: config/default.yml)'
+    )
+    parser.add_argument(
+        '--subsets',
+        type=str,
+        choices=['none', '10k', '8k', 'both'],
+        default='none',
+        help='Generate keypoint subsets (10k, 8k, or both)'
+    )
+    parser.add_argument(
+        '--n-jobs',
+        type=int,
+        default=None,
+        help='Number of parallel workers (default: CPU count)'
+    )
+    parser.add_argument(
+        '--n-samples',
+        type=int,
+        default=3,
+        help='Number of random videos to sample for logging (default: 3)'
     )
 
     return parser.parse_args()
@@ -99,7 +119,7 @@ def main():
     # Load configuration
     try:
         config = load_config(args.config)
-        logger.info(f"Loaded configuration from: {args.config or 'config/default.yaml'}")
+        logger.info(f"Loaded configuration from: {args.config or 'config/default.yml'}")
     except FileNotFoundError as e:
         logger.warning(f"Config file not found: {e}")
         logger.warning("Using default parameters")
@@ -113,18 +133,21 @@ def main():
     logger.info(f"Pose version: {pose_version}")
     logger.info(f"Validate output: {validate_output}")
     logger.info(f"Overwrite existing: {overwrite}")
+    logger.info(f"Parallel workers: {args.n_jobs or 'auto (CPU count)'}")
+    logger.info(f"Sample videos for logging: {args.n_samples}")
     logger.info("="*60)
 
-    # Convert H5 to CSV
+    # Convert H5 to CSV using parallel processing
     try:
-        logger.info("Starting conversion...")
-        converted_files = h5_to_csv_poses(
+        logger.info("Starting parallel conversion...")
+        converted_files = h5_to_csv_poses_parallel(
             folder_path=args.input,
             dest_path=args.output,
             file_pattern="*.h5",
             pose_version=pose_version,
             overwrite=overwrite,
-            validate_output=validate_output
+            validate_output=validate_output,
+            n_jobs=args.n_jobs
         )
 
         logger.info("="*60)
@@ -136,6 +159,96 @@ def main():
         print(f"\nConversion completed!")
         print(f"Converted {len(converted_files)} files")
         print(f"Output: {args.output}")
+
+        # Generate keypoint subsets if requested
+        if args.subsets != 'none':
+            logger.info("="*60)
+            logger.info("Generating keypoint subsets...")
+            logger.info("="*60)
+
+            # Determine which subsets to create
+            subsets_to_create = []
+            if args.subsets == 'both':
+                subsets_to_create = ['10k', '8k']
+            else:
+                subsets_to_create = [args.subsets]
+
+            # Get project root for config generation
+            project_root = pathlib.Path(__file__).parent.parent
+            default_config_path = project_root / "config" / "default.yml"
+
+            for subset_type in subsets_to_create:
+                try:
+                    logger.info(f"\nCreating {subset_type} subset...")
+
+                    # Create subset CSV files
+                    output_base = pathlib.Path(args.output)
+                    subset_dir = output_base.parent / f"{output_base.name}_{subset_type}"
+
+                    subset_files = create_keypoint_subset(
+                        source_dir=args.output,
+                        dest_dir=str(subset_dir),
+                        subset_type=subset_type,
+                        overwrite=overwrite,
+                        n_jobs=args.n_jobs
+                    )
+
+                    logger.info(f"Created {len(subset_files)} {subset_type} CSV files")
+                    print(f"  {subset_type}: {len(subset_files)} files → {subset_dir}")
+
+                    # Generate corresponding config file
+                    config_output_path = project_root / "config" / f"config_{subset_type}.yml"
+                    subset_config = SUBSET_CONFIGS[subset_type]
+
+                    generate_subset_config(
+                        source_config_path=str(default_config_path),
+                        output_config_path=str(config_output_path),
+                        remove_indices=subset_config['remove_indices'],
+                        subset_name=subset_type
+                    )
+
+                    logger.info(f"Generated config file: {config_output_path}")
+                    print(f"  Config: {config_output_path}")
+
+                except Exception as e:
+                    logger.error(f"Failed to create {subset_type} subset: {e}", exc_info=True)
+                    print(f"  ERROR: Failed to create {subset_type} subset")
+                    continue
+
+            logger.info("="*60)
+            logger.info("Subset generation completed!")
+            logger.info("="*60)
+            print("\nSubset generation completed!")
+
+        # Log sample data for verification
+        if args.n_samples > 0:
+            logger.info("\n" + "="*60)
+            logger.info("Logging sample data for verification...")
+            logger.info("="*60)
+            
+            # Collect subset directories
+            subset_dirs = {}
+            if args.subsets != 'none':
+                output_base = pathlib.Path(args.output)
+                subsets_to_check = []
+                if args.subsets == 'both':
+                    subsets_to_check = ['10k', '8k']
+                else:
+                    subsets_to_check = [args.subsets]
+                
+                for subset_type in subsets_to_check:
+                    subset_dir = output_base.parent / f"{output_base.name}_{subset_type}"
+                    if subset_dir.exists():
+                        subset_dirs[subset_type] = str(subset_dir)
+            
+            log_sample_data(
+                h5_dir=args.input,
+                csv_dir=args.output,
+                subset_dirs=subset_dirs,
+                subset_configs=SUBSET_CONFIGS,
+                pose_version=pose_version,
+                n_samples=args.n_samples
+            )
 
     except Exception as e:
         logger.error(f"Preprocessing failed: {e}", exc_info=True)

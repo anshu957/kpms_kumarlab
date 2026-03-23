@@ -2,10 +2,10 @@
 # Override via CLI arguments or create experiment-specific configs
 
 # Model hyperparameters
-kappa: 0.1                     # Stickiness parameter (higher = longer behavioral bouts)
-arhmm_iters: 10               # AR-HMM iterations
-full_model_iters: 10          # Full model iterations
-mixed_map_iters: 8            # GPU memory management (higher = less memory, slower)
+kappa: 1e6                     # Stickiness parameter (higher = longer behavioral bouts)
+arhmm_iters: 50               # AR-HMM iterations
+full_model_iters: 400          # Full model iterations
+mixed_map_iters: 4            # GPU memory management (higher = less memory, slower)
 num_gpus: 1                   # Number of GPUs to use
 
 # Data preprocessing

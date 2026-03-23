@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def load_and_format_data(
     pose_dir: str,
     project_path: pathlib.Path
-) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, np.ndarray]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """Load keypoints and format data for KPMS analysis.
 
     Args:
@@ -32,6 +32,7 @@ def load_and_format_data(
             - data: Formatted data dictionary for KPMS
             - metadata: Metadata dictionary
             - coordinates: Raw coordinates dictionary
+            - confidences: Confidence scores dictionary
 
     Raises:
         FileNotFoundError: If pose directory doesn't exist
@@ -73,7 +74,7 @@ def load_and_format_data(
         )
 
         logger.info("Data formatting completed successfully")
-        return data, metadata, coordinates
+        return data, metadata, coordinates, confidences
 
     except Exception as e:
         logger.error(f"Failed to load and format data: {e}")
@@ -105,7 +106,7 @@ def perform_pca(
 
     # Calculate number of components for >90% variance
     cumsum_var = np.cumsum(pca.explained_variance_ratio_)
-    n_components_90 = int(np.where(cumsum_var >= 0.9)[0][0] + 1)
+    n_components_90 = int(np.where(cumsum_var >= 0.90)[0][0] + 1)
 
     logger.info(
         f"Number of PCA components explaining >90% variance: {n_components_90}")

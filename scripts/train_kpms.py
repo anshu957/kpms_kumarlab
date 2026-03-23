@@ -143,7 +143,7 @@ def parse_args():
         '--config',
         type=str,
         default=None,
-        help='Path to config file (default: config/default.yaml)'
+        help='Path to config file (default: config/default.yml)'
     )
 
     return parser.parse_args()
@@ -156,12 +156,13 @@ def initialize_project(project_path: pathlib.Path, video_dir: str,
     """Initialize KeyPoint-MoSeq project with configurations."""
     logger.info(f"Initializing project at: {project_path}")
 
-    # Setup project
+    # Setup project (always use overwrite=True to handle incomplete initializations)
     kpms.setup_project(
         project_path,
         video_dir=video_dir,
         bodyparts=bodyparts,
-        skeleton=skeleton
+        skeleton=skeleton,
+        overwrite=True
     )
 
     # Update configuration
@@ -195,7 +196,7 @@ def main():
     # Load configuration and merge with CLI arguments
     try:
         config = load_config(args.config)
-        logger.info(f"Loaded config from: {args.config or 'config/default.yaml'}")
+        logger.info(f"Loaded config from: {args.config or 'config/default.yml'}")
     except FileNotFoundError as e:
         logger.warning(f"Config file not found: {e}")
         logger.warning("Using CLI arguments only")
@@ -204,10 +205,10 @@ def main():
     # Merge config with CLI arguments (CLI overrides config)
     config = merge_config_with_args(config, args)
 
-    # Save used configuration to results directory for reproducibility
-    config_save_path = project_path / "config.yaml"
+    # Save training hyperparameters to separate file (KPMS uses config.yml for its own config)
+    config_save_path = project_path / "training_params.yml"
     save_config(config, config_save_path)
-    logger.info(f"Saved experiment config to: {config_save_path}")
+    logger.info(f"Saved training parameters to: {config_save_path}")
 
     # Extract values from merged config
     kappa = config.get('kappa', args.kappa)
@@ -252,11 +253,16 @@ def main():
         logger.info("Initial GPU status:")
         print_gpu_usage()
 
-    # Initialize project
-    initialize_project(
-        project_path, video_dir, bodyparts, skeleton,
-        anterior_bodyparts, posterior_bodyparts, logger
-    )
+    # Initialize project only if not already initialized
+    config_file = project_path / "config.yml"
+    if config_file.exists():
+        logger.info(f"Project already initialized at {project_path}, skipping setup")
+    else:
+        logger.info(f"Initializing new project at {project_path}")
+        initialize_project(
+            project_path, video_dir, bodyparts, skeleton,
+            anterior_bodyparts, posterior_bodyparts, logger
+        )
 
     # Configuration function
     config_kpms = lambda: kpms.load_config(project_path)
@@ -270,13 +276,13 @@ def main():
     try:
         # Step 1: Load and format data
         logger.info("Step 1/4: Loading and formatting data...")
-        data, metadata, coordinates = load_and_format_data(pose_dir, project_path)
+        data, metadata, coordinates, confidences = load_and_format_data(pose_dir, project_path)
 
         # Validate data quality
         logger.info("Validating data quality...")
         quality_report = validate_data_quality(
             coordinates,
-            metadata.get('confidences', {})
+            confidences
         )
         for filename, metrics in quality_report.items():
             logger.info(f"  {filename}: {metrics['total_frames']} frames, "

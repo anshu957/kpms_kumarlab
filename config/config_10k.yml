@@ -1,0 +1,41 @@
+# KeyPoint-MoSeq Configuration
+# Generated subset configuration
+
+kappa: "1e6"
+arhmm_iters: 50
+full_model_iters: 400
+mixed_map_iters: 4
+num_gpus: 1
+pose_version: "v6"
+validate_output: true
+overwrite: false
+bodyparts:
+  - "NOSE_INDEX"
+  - "LEFT_EAR_INDEX"
+  - "RIGHT_EAR_INDEX"
+  - "BASE_NECK_INDEX"
+  - "LEFT_FRONT_PAW_INDEX"
+  - "RIGHT_FRONT_PAW_INDEX"
+  - "CENTER_SPINE_INDEX"
+  - "LEFT_REAR_PAW_INDEX"
+  - "RIGHT_REAR_PAW_INDEX"
+  - "BASE_TAIL_INDEX"
+skeleton:
+  - ["BASE_TAIL_INDEX", "RIGHT_REAR_PAW_INDEX"]
+  - ["BASE_TAIL_INDEX", "LEFT_REAR_PAW_INDEX"]
+  - ["BASE_TAIL_INDEX", "CENTER_SPINE_INDEX"]
+  - ["CENTER_SPINE_INDEX", "LEFT_FRONT_PAW_INDEX"]
+  - ["CENTER_SPINE_INDEX", "RIGHT_FRONT_PAW_INDEX"]
+  - ["CENTER_SPINE_INDEX", "BASE_NECK_INDEX"]
+  - ["BASE_NECK_INDEX", "NOSE_INDEX"]
+anterior_bodyparts:
+  - "BASE_NECK_INDEX"
+posterior_bodyparts:
+  - "BASE_TAIL_INDEX"
+_subset_info:
+  name: "10k"
+  n_keypoints: 10
+  removed_indices:
+  - 10
+  - 11
+  source_config: "/projects/kumar-lab/USERS/chouda/unsupervised/KPMS/kp-moseq/kpms_combined_OFA/kpms_kumarlab/config/default.yml"
