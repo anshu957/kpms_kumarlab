@@ -317,10 +317,20 @@ def main():
         logger.info(f"Model saved as: {model_name}")
 
         # Step 4: Generate visualizations (optional)
+        viz_status = None
         if not args.skip_visualizations:
             logger.info("Step 4/4: Generating visualizations...")
-            generate_plots_and_movies(model_name, results, coordinates,
-                                     project_path, config_kpms)
+            viz_status = generate_plots_and_movies(model_name, results, coordinates,
+                                                   project_path, config_kpms)
+
+            # Log visualization summary
+            successful = [k for k, v in viz_status.items() if v]
+            failed = [k for k, v in viz_status.items() if not v]
+
+            if failed:
+                logger.warning(f"Some visualizations failed: {', '.join(failed)}")
+                print(f"\nWARNING: Some visualizations failed: {', '.join(failed)}")
+                print("Check logs for details. Training was successful.")
         else:
             logger.info("Step 4/4: Skipping visualizations (--skip-visualizations)")
 
