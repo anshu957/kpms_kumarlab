@@ -1,7 +1,7 @@
 # KeyPoint-MoSeq Configuration
 # Generated subset configuration
 
-kappa: "1e6"
+kappa: 1000000.0
 arhmm_iters: 50
 full_model_iters: 400
 mixed_map_iters: 4

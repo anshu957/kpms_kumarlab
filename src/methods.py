@@ -395,7 +395,7 @@ def run_complete_pipeline(
             return kpms.load_config(project_path_obj)
 
         # Execute pipeline steps
-        data, metadata, coordinates = load_and_format_data(
+        data, metadata, coordinates, _ = load_and_format_data(
             pose_dir, project_path_obj)
         pca, n_components_90 = perform_pca(data, config_func, project_path_obj)
         model, model_name, results = fit_and_save_model(

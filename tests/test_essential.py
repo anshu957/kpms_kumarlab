@@ -37,10 +37,8 @@ class TestEssentialFunctionality(unittest.TestCase):
 
         # Create test data: 10 frames, 12 keypoints (x, y, conf for each)
         test_data = np.random.rand(10, 36)  # 12 keypoints * 3 values
-        header = ["header_line"]
 
         with open(csv_path, 'w') as f:
-            f.write("header\n")
             for row in test_data:
                 f.write(",".join(map(str, row)) + "\n")
 
@@ -119,20 +117,23 @@ class TestEssentialFunctionality(unittest.TestCase):
         self.assertEqual(test_coords.shape[1], test_confs.shape[1])
         self.assertEqual(test_coords.shape[2], 2)  # x, y coordinates
 
-    def test_coordinate_swap(self):
-        """Test that coordinate swapping (JABS format) works correctly."""
-        # Create test data where x != y to verify swapping
-        test_data = np.array([
-            [1.0, 2.0, 0.9],  # x=1, y=2, conf=0.9
-            [3.0, 4.0, 0.8],  # x=3, y=4, conf=0.8
-        ]).reshape(1, 2, 3)  # 1 frame, 2 keypoints, 3 values each
+    def test_load_keypoints_pd_preserves_csv_xy_order(self):
+        """Test that CSV coordinates remain in x/y order when loaded."""
+        csv_path = os.path.join(self.temp_dir, "ordered_pose.csv")
 
-        # Simulate the coordinate extraction and swapping from load_keypoints_pd
-        coords = test_data[:, :, :2][:, :, ::-1]  # Extract coords and swap x,y
+        with open(csv_path, 'w') as f:
+            f.write("1.0,2.0,0.9,3.0,4.0,0.8\n")
 
-        # After swapping, first coordinate should be [2, 1] (y, x)
-        expected = np.array([[[2.0, 1.0], [4.0, 3.0]]])
-        np.testing.assert_array_equal(coords, expected)
+        coords, confs = load_keypoints_pd(self.temp_dir)
+
+        np.testing.assert_array_equal(
+            coords["ordered_pose.csv"],
+            np.array([[[1.0, 2.0], [3.0, 4.0]]]),
+        )
+        np.testing.assert_array_equal(
+            confs["ordered_pose.csv"],
+            np.array([[0.9, 0.8]]),
+        )
 
 
 if __name__ == '__main__':
