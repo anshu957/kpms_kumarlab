@@ -7,16 +7,16 @@ runs on HPC clusters. It properly configures JAX GPU memory management to avoid
 preallocation issues.
 
 Usage:
-    python train_kpms.py --pose-dir <path> --project-path <path> --video-dir <path> [options]
+    python train_kpms.py --pose-dir <path> --project-path <path> [--video-dir <path>] [options]
 
 Example:
     python train_kpms.py \
         --pose-dir examples/jabs600_v2/poses \
         --project-path results/my_analysis \
-        --video-dir examples/jabs600_v2/videos \
         --kappa 0.1 \
         --arhmm-iters 10 \
-        --full-model-iters 10
+        --full-model-iters 10 \
+        --skip-visualizations
 """
 
 import os
@@ -33,7 +33,7 @@ os.environ['XLA_PYTHON_CLIENT_ALLOCATOR'] = 'platform'
 import argparse
 import pathlib
 import logging
-from typing import List
+from typing import List, Optional
 
 # JAX and KeyPoint-MoSeq imports
 import jax
@@ -76,8 +76,8 @@ def parse_args():
     parser.add_argument(
         '--video-dir',
         type=str,
-        required=True,
-        help='Directory containing corresponding video files'
+        default=None,
+        help='Directory containing corresponding video files (required unless --skip-visualizations is used)'
     )
 
     # Model hyperparameters
@@ -149,7 +149,19 @@ def parse_args():
     return parser.parse_args()
 
 
-def initialize_project(project_path: pathlib.Path, video_dir: str,
+def resolve_video_dir(args: argparse.Namespace, config: dict) -> Optional[str]:
+    """Resolve the video directory from CLI/config and enforce visualization requirements."""
+    video_dir = args.video_dir or config.get('video_dir')
+
+    if not video_dir and not args.skip_visualizations:
+        raise ValueError(
+            "Video directory is required unless --skip-visualizations is used."
+        )
+
+    return video_dir
+
+
+def initialize_project(project_path: pathlib.Path, video_dir: Optional[str],
                        bodyparts: List[str], skeleton: List[List[str]],
                        anterior_bodyparts: List[str], posterior_bodyparts: List[str],
                        logger: logging.Logger):
@@ -157,12 +169,19 @@ def initialize_project(project_path: pathlib.Path, video_dir: str,
     logger.info(f"Initializing project at: {project_path}")
 
     # Setup project (always use overwrite=True to handle incomplete initializations)
+    setup_kwargs = {
+        'bodyparts': bodyparts,
+        'skeleton': skeleton,
+        'overwrite': True,
+    }
+    if video_dir:
+        setup_kwargs['video_dir'] = video_dir
+    else:
+        logger.info("No video directory provided; motif grid movie generation will be unavailable")
+
     kpms.setup_project(
         project_path,
-        video_dir=video_dir,
-        bodyparts=bodyparts,
-        skeleton=skeleton,
-        overwrite=True
+        **setup_kwargs
     )
 
     # Update configuration
@@ -183,8 +202,6 @@ def main():
     # Convert paths to pathlib objects
     project_path = pathlib.Path(args.project_path)
     pose_dir = args.pose_dir
-    video_dir = args.video_dir
-
     # Create project directory
     project_path.mkdir(parents=True, exist_ok=True)
 
@@ -204,6 +221,7 @@ def main():
 
     # Merge config with CLI arguments (CLI overrides config)
     config = merge_config_with_args(config, args)
+    video_dir = resolve_video_dir(args, config)
 
     # Save training hyperparameters to separate file (KPMS uses config.yml for its own config)
     config_save_path = project_path / "training_params.yml"
@@ -231,7 +249,7 @@ def main():
     logger.info(f"XLA_PYTHON_CLIENT_ALLOCATOR: {os.environ.get('XLA_PYTHON_CLIENT_ALLOCATOR')}")
     logger.info(f"Pose directory: {pose_dir}")
     logger.info(f"Project path: {project_path}")
-    logger.info(f"Video directory: {video_dir}")
+    logger.info(f"Video directory: {video_dir or 'Not provided'}")
     logger.info(f"Kappa: {kappa}")
     logger.info(f"AR-HMM iterations: {arhmm_iters}")
     logger.info(f"Full model iterations: {full_model_iters}")
@@ -263,6 +281,9 @@ def main():
             project_path, video_dir, bodyparts, skeleton,
             anterior_bodyparts, posterior_bodyparts, logger
         )
+
+    if video_dir:
+        kpms.update_config(project_path, video_dir=video_dir)
 
     # Configuration function
     config_kpms = lambda: kpms.load_config(project_path)

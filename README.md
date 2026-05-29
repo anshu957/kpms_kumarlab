@@ -143,6 +143,16 @@ python scripts/train_kpms.py \
     --arhmm-iters 50 \
     --full-model-iters 300 \
     --config config/config_10k.yml
+
+# Skip motif grid movies and train without videos
+python scripts/train_kpms.py \
+    --pose-dir data/combined_OFA/poses_csv_10k/ \
+    --project-path results/combined_OFA_kappa_1e6 \
+    --kappa 1e6 \
+    --arhmm-iters 50 \
+    --full-model-iters 300 \
+    --config config/config_10k.yml \
+    --skip-visualizations
 ```
 
 ### 3c. Interactive (notebook)

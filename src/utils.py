@@ -362,6 +362,7 @@ def merge_config_with_args(config: Dict[str, Any], args: Any) -> Dict[str, Any]:
         'full_model_iters': 'full_model_iters',
         'mixed_map_iters': 'mixed_map_iters',
         'num_gpus': 'num_gpus',
+        'video_dir': 'video_dir',
         'pose_version': 'pose_version',
         'anterior_bodyparts': 'anterior_bodyparts',
         'posterior_bodyparts': 'posterior_bodyparts',
