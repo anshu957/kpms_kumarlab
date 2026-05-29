@@ -5,12 +5,14 @@ the research pipeline works correctly. Tests use mock data to avoid
 dependencies on external files.
 """
 
+from src.preprocessing import h5_to_csv_poses
 from src.utils import load_keypoints_pd, validate_data_quality, set_up_logging
 import unittest
 import numpy as np
 import os
 import tempfile
 import pathlib
+import h5py
 from unittest.mock import patch, MagicMock
 import sys
 
@@ -117,18 +119,31 @@ class TestEssentialFunctionality(unittest.TestCase):
         self.assertEqual(test_coords.shape[1], test_confs.shape[1])
         self.assertEqual(test_coords.shape[2], 2)  # x, y coordinates
 
-    def test_load_keypoints_pd_preserves_csv_xy_order(self):
-        """Test that CSV coordinates remain in x/y order when loaded."""
-        csv_path = os.path.join(self.temp_dir, "ordered_pose.csv")
+    def test_h5_conversion_and_csv_load_do_not_double_swap_coordinates(self):
+        """Test that H5 preprocessing swaps once and CSV loading preserves x/y order."""
+        h5_dir = os.path.join(self.temp_dir, "h5")
+        csv_dir = os.path.join(self.temp_dir, "csv")
+        os.makedirs(h5_dir)
+        os.makedirs(csv_dir)
 
-        with open(csv_path, 'w') as f:
-            f.write("1.0,2.0,0.9,3.0,4.0,0.8\n")
+        h5_path = os.path.join(h5_dir, "ordered_pose.h5")
+        with h5py.File(h5_path, 'w') as f:
+            poseest = f.create_group('poseest')
+            poseest.create_dataset(
+                'points',
+                data=np.array([[[[10.0, 20.0], [30.0, 40.0]]]]),
+            )
+            poseest.create_dataset(
+                'confidence',
+                data=np.array([[[0.9, 0.8]]]),
+            )
 
-        coords, confs = load_keypoints_pd(self.temp_dir)
+        h5_to_csv_poses(h5_dir, csv_dir, validate_output=True)
+        coords, confs = load_keypoints_pd(csv_dir)
 
         np.testing.assert_array_equal(
             coords["ordered_pose.csv"],
-            np.array([[[1.0, 2.0], [3.0, 4.0]]]),
+            np.array([[[20.0, 10.0], [40.0, 30.0]]]),
         )
         np.testing.assert_array_equal(
             confs["ordered_pose.csv"],
