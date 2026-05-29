@@ -198,12 +198,6 @@ kpms_kumarlab/
 └── tests/test_essential.py   # Unit tests (mock data, no external dependencies)
 ```
 
-## Known Issues
-
-- **Double x/y coordinate swap:** `preprocessing.py` converts JABS `(row, col)` → `(x, y)` in the CSV, but `utils.py::load_keypoints_pd` reverses this swap again. The two cancel, so KPMS receives coordinates in the original JABS `(row, col) = (image_y, image_x)` order. Syllable segmentation is unaffected, but **trajectory plots and laterality comparisons are left-right mirrored**. Fix: remove the `[::-1]` swap in `load_keypoints_pd`.
-- **`run_complete_pipeline` unpack bug:** Unpacks `load_and_format_data()` into 3 variables; the function returns 4. Not used by any current script, but will crash if called.
-- **`kappa` as string in config_10k.yml:** `kappa: "1e6"` should be `kappa: 1e6` (unquoted float).
-
 ## Citation
 
 This work is a custom pipeline (to work with JABS data) on the KeyPoint-MoSeq framework, which is described in the following publication and its associated repository:

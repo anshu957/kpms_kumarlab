@@ -455,7 +455,8 @@ def log_sample_data(
             if os.path.exists(csv_path):
                 try:
                     df = pd.read_csv(csv_path, header=None)
-                    logger.info(f"CSV file (frame 0, first {n_keypoints_to_show} keypoints, after x/y swap):")
+                    logger.info(
+                        f"CSV file (frame 0, first {n_keypoints_to_show} keypoints, stored in x/y order):")
                     
                     for i in range(min(n_keypoints_to_show, 12)):
                         x = df.iloc[0, 3*i]

@@ -5,12 +5,14 @@ the research pipeline works correctly. Tests use mock data to avoid
 dependencies on external files.
 """
 
+from src.preprocessing import h5_to_csv_poses
 from src.utils import load_keypoints_pd, validate_data_quality, set_up_logging
 import unittest
 import numpy as np
 import os
 import tempfile
 import pathlib
+import h5py
 from unittest.mock import patch, MagicMock
 import sys
 
@@ -37,10 +39,8 @@ class TestEssentialFunctionality(unittest.TestCase):
 
         # Create test data: 10 frames, 12 keypoints (x, y, conf for each)
         test_data = np.random.rand(10, 36)  # 12 keypoints * 3 values
-        header = ["header_line"]
 
         with open(csv_path, 'w') as f:
-            f.write("header\n")
             for row in test_data:
                 f.write(",".join(map(str, row)) + "\n")
 
@@ -119,20 +119,36 @@ class TestEssentialFunctionality(unittest.TestCase):
         self.assertEqual(test_coords.shape[1], test_confs.shape[1])
         self.assertEqual(test_coords.shape[2], 2)  # x, y coordinates
 
-    def test_coordinate_swap(self):
-        """Test that coordinate swapping (JABS format) works correctly."""
-        # Create test data where x != y to verify swapping
-        test_data = np.array([
-            [1.0, 2.0, 0.9],  # x=1, y=2, conf=0.9
-            [3.0, 4.0, 0.8],  # x=3, y=4, conf=0.8
-        ]).reshape(1, 2, 3)  # 1 frame, 2 keypoints, 3 values each
+    def test_h5_conversion_and_csv_load_do_not_double_swap_coordinates(self):
+        """Test that H5 preprocessing swaps once and CSV loading preserves x/y order."""
+        h5_dir = os.path.join(self.temp_dir, "h5")
+        csv_dir = os.path.join(self.temp_dir, "csv")
+        os.makedirs(h5_dir)
+        os.makedirs(csv_dir)
 
-        # Simulate the coordinate extraction and swapping from load_keypoints_pd
-        coords = test_data[:, :, :2][:, :, ::-1]  # Extract coords and swap x,y
+        h5_path = os.path.join(h5_dir, "ordered_pose.h5")
+        with h5py.File(h5_path, 'w') as f:
+            poseest = f.create_group('poseest')
+            poseest.create_dataset(
+                'points',
+                data=np.array([[[[10.0, 20.0], [30.0, 40.0]]]]),
+            )
+            poseest.create_dataset(
+                'confidence',
+                data=np.array([[[0.9, 0.8]]]),
+            )
 
-        # After swapping, first coordinate should be [2, 1] (y, x)
-        expected = np.array([[[2.0, 1.0], [4.0, 3.0]]])
-        np.testing.assert_array_equal(coords, expected)
+        h5_to_csv_poses(h5_dir, csv_dir, validate_output=True)
+        coords, confs = load_keypoints_pd(csv_dir)
+
+        np.testing.assert_array_equal(
+            coords["ordered_pose.csv"],
+            np.array([[[20.0, 10.0], [40.0, 30.0]]]),
+        )
+        np.testing.assert_array_equal(
+            confs["ordered_pose.csv"],
+            np.array([[0.9, 0.8]]),
+        )
 
 
 if __name__ == '__main__':
