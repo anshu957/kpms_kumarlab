@@ -282,6 +282,9 @@ def main():
             anterior_bodyparts, posterior_bodyparts, logger
         )
 
+    if video_dir:
+        kpms.update_config(project_path, video_dir=video_dir)
+
     # Configuration function
     config_kpms = lambda: kpms.load_config(project_path)
 

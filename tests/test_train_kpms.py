@@ -70,6 +70,16 @@ class TestTrainKpms(unittest.TestCase):
 
         self.assertIsNone(module.resolve_video_dir(args, {}))
 
+    def test_resolve_video_dir_uses_config_value(self):
+        """Configured video_dir should satisfy the visualization requirement."""
+        module, _ = self.import_train_module()
+        args = types.SimpleNamespace(video_dir=None, skip_visualizations=False)
+
+        self.assertEqual(
+            module.resolve_video_dir(args, {"video_dir": "/tmp/videos"}),
+            "/tmp/videos",
+        )
+
     def test_initialize_project_omits_video_dir_when_absent(self):
         """Project setup should not pass a video_dir when none was provided."""
         module, fake_kpms = self.import_train_module()
