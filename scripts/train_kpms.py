@@ -16,7 +16,7 @@ Example:
         --kappa 0.1 \
         --arhmm-iters 10 \
         --full-model-iters 10 \
-        --skip-visualizations
+        --skip-videos
 """
 
 import os
@@ -77,7 +77,7 @@ def parse_args():
         '--video-dir',
         type=str,
         default=None,
-        help='Directory containing corresponding video files (required unless --skip-visualizations is used)'
+        help='Directory containing corresponding video files (required unless --skip-videos is used)'
     )
 
     # Model hyperparameters
@@ -130,9 +130,11 @@ def parse_args():
         help='Posterior bodyparts for orientation'
     )
     parser.add_argument(
-        '--skip-visualizations',
+        '--skip-videos',
         action='store_true',
-        help='Skip generating plots and movies (faster completion)'
+        help='Skip video-based motif grid movies and allow training without a video '
+             'directory. Pose-based visualizations (trajectory plots, dendrogram) are '
+             'still generated.'
     )
     parser.add_argument(
         '--dry-run',
@@ -150,12 +152,20 @@ def parse_args():
 
 
 def resolve_video_dir(args: argparse.Namespace, config: dict) -> Optional[str]:
-    """Resolve the video directory from CLI/config and enforce visualization requirements."""
+    """Resolve the video directory from CLI/config and enforce video requirements.
+
+    When --skip-videos is set, videos are not used at all, so no video directory is
+    required (any provided value is ignored). Otherwise a video directory must be
+    available via CLI or config so grid movies can be generated.
+    """
+    if args.skip_videos:
+        return None
+
     video_dir = args.video_dir or config.get('video_dir')
 
-    if not video_dir and not args.skip_visualizations:
+    if not video_dir:
         raise ValueError(
-            "Video directory is required unless --skip-visualizations is used."
+            "Video directory is required unless --skip-videos is used."
         )
 
     return video_dir
@@ -337,23 +347,24 @@ def main():
 
         logger.info(f"Model saved as: {model_name}")
 
-        # Step 4: Generate visualizations (optional)
-        viz_status = None
-        if not args.skip_visualizations:
-            logger.info("Step 4/4: Generating visualizations...")
-            viz_status = generate_plots_and_movies(model_name, results, coordinates,
-                                                   project_path, config_kpms)
+        # Step 4: Generate visualizations
+        # Pose-based plots always run; video-based grid movies are skipped when
+        # --skip-videos is set (or no video directory is available).
+        logger.info("Step 4/4: Generating visualizations...")
+        if args.skip_videos:
+            logger.info("Video-based grid movies will be skipped (--skip-videos)")
+        viz_status = generate_plots_and_movies(model_name, results, coordinates,
+                                               project_path, config_kpms,
+                                               skip_videos=args.skip_videos)
 
-            # Log visualization summary
-            successful = [k for k, v in viz_status.items() if v]
-            failed = [k for k, v in viz_status.items() if not v]
+        # Log visualization summary
+        successful = [k for k, v in viz_status.items() if v]
+        failed = [k for k, v in viz_status.items() if not v]
 
-            if failed:
-                logger.warning(f"Some visualizations failed: {', '.join(failed)}")
-                print(f"\nWARNING: Some visualizations failed: {', '.join(failed)}")
-                print("Check logs for details. Training was successful.")
-        else:
-            logger.info("Step 4/4: Skipping visualizations (--skip-visualizations)")
+        if failed:
+            logger.warning(f"Some visualizations failed: {', '.join(failed)}")
+            print(f"\nWARNING: Some visualizations failed: {', '.join(failed)}")
+            print("Check logs for details. Training was successful.")
 
         logger.info("="*80)
         logger.info("Training completed successfully!")

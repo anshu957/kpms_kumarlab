@@ -55,25 +55,25 @@ class TestTrainKpms(unittest.TestCase):
 
         return module, fake_kpms
 
-    def test_resolve_video_dir_requires_videos_when_visualizations_enabled(self):
-        """Training should still require videos unless visualizations are skipped."""
+    def test_resolve_video_dir_requires_videos_by_default(self):
+        """Training should require videos unless --skip-videos is used."""
         module, _ = self.import_train_module()
-        args = types.SimpleNamespace(video_dir=None, skip_visualizations=False)
+        args = types.SimpleNamespace(video_dir=None, skip_videos=False)
 
         with self.assertRaisesRegex(ValueError, "Video directory is required"):
             module.resolve_video_dir(args, {})
 
-    def test_resolve_video_dir_allows_skipping_video_dir(self):
-        """Video directory should be optional when visualizations are skipped."""
+    def test_resolve_video_dir_allows_skipping_videos(self):
+        """Video directory should be optional (and ignored) when videos are skipped."""
         module, _ = self.import_train_module()
-        args = types.SimpleNamespace(video_dir=None, skip_visualizations=True)
+        args = types.SimpleNamespace(video_dir="/tmp/videos", skip_videos=True)
 
         self.assertIsNone(module.resolve_video_dir(args, {}))
 
     def test_resolve_video_dir_uses_config_value(self):
-        """Configured video_dir should satisfy the visualization requirement."""
+        """Configured video_dir should satisfy the video requirement."""
         module, _ = self.import_train_module()
-        args = types.SimpleNamespace(video_dir=None, skip_visualizations=False)
+        args = types.SimpleNamespace(video_dir=None, skip_videos=False)
 
         self.assertEqual(
             module.resolve_video_dir(args, {"video_dir": "/tmp/videos"}),
