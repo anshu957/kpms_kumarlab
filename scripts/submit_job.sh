@@ -67,6 +67,12 @@ MIXED_MAP_ITERS=8           # GPU memory management
 # GPU configuration
 NUM_GPUS=1                   # Number of GPUs to use
 
+# Video configuration
+# Set to "true" to train without videos. This skips the video-based motif grid
+# movies (pose-based trajectory plots and dendrogram are still generated) and
+# means VIDEO_DIR is not required.
+SKIP_VIDEOS=false
+
 PROJECT_PATH="${PROJECT_ROOT}/results/combined_OFA_kappa_${KAPPA}"
 #PROJECT_PATH="${PROJECT_ROOT}/results/test_${KAPPA}"
 
@@ -80,11 +86,24 @@ CONFIG_10k="${PROJECT_ROOT}/config/config_10k.yml"
 # Change to project directory
 cd $PROJECT_ROOT || exit 1
 
+# Build optional arguments
+# Skip videos / motif grid movies when SKIP_VIDEOS is enabled
+EXTRA_ARGS=()
+if [ "$SKIP_VIDEOS" = "true" ]; then
+    EXTRA_ARGS+=(--skip-videos)
+else
+    EXTRA_ARGS+=(--video-dir "$VIDEO_DIR")
+fi
+
 # Run training
 echo "Starting KPMS training..."
 echo "Pose directory: $POSE_DIR"
 echo "Project path: $PROJECT_PATH"
-echo "Video directory: $VIDEO_DIR"
+if [ "$SKIP_VIDEOS" = "true" ]; then
+    echo "Video directory: (skipped - training without videos)"
+else
+    echo "Video directory: $VIDEO_DIR"
+fi
 echo "Kappa: $KAPPA"
 echo "Config: $CONFIG_10k"
 echo "=========================================="
@@ -92,14 +111,14 @@ echo "=========================================="
 python scripts/train_kpms.py \
     --pose-dir "$POSE_DIR" \
     --project-path "$PROJECT_PATH" \
-    --video-dir "$VIDEO_DIR" \
     --kappa "$KAPPA" \
     --arhmm-iters "$ARHMM_ITERS" \
     --full-model-iters "$FULL_MODEL_ITERS" \
     --mixed-map-iters "$MIXED_MAP_ITERS" \
-    --num-gpus "$NUM_GPUS"\
-    --config "$CONFIG_10k"
-   
+    --num-gpus "$NUM_GPUS" \
+    --config "$CONFIG_10k" \
+    "${EXTRA_ARGS[@]}"
+
 
 # Check exit status
 if [ $? -eq 0 ]; then

@@ -144,7 +144,8 @@ python scripts/train_kpms.py \
     --full-model-iters 300 \
     --config config/config_10k.yml
 
-# Skip motif grid movies and train without videos
+# Train without videos: skips the video-based motif grid movies but still
+# generates pose-based trajectory plots and the similarity dendrogram
 python scripts/train_kpms.py \
     --pose-dir data/combined_OFA/poses_csv_10k/ \
     --project-path results/combined_OFA_kappa_1e6 \
@@ -152,7 +153,7 @@ python scripts/train_kpms.py \
     --arhmm-iters 50 \
     --full-model-iters 300 \
     --config config/config_10k.yml \
-    --skip-visualizations
+    --skip-videos
 ```
 
 ### 3c. Interactive (notebook)

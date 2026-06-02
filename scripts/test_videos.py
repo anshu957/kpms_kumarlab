@@ -208,7 +208,7 @@ def main():
         logger.warning("\nThese videos may cause issues during visualization generation.")
         logger.warning("Possible solutions:")
         logger.warning("  1. Re-encode videos using ffmpeg with standard codecs")
-        logger.warning("  2. Use --skip-visualizations flag during training")
+        logger.warning("  2. Use --skip-videos flag during training")
         logger.warning("  3. Remove problematic videos from the dataset")
         logger.warning("\nExample re-encoding command:")
         logger.warning("  ffmpeg -i input.mp4 -c:v libx264 -preset slow -crf 18 output.mp4")

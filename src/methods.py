@@ -234,9 +234,14 @@ def generate_plots_and_movies(
     results: Dict[str, Any],
     coordinates: Dict[str, np.ndarray],
     project_path: pathlib.Path,
-    config_func: Callable[[], Dict[str, Any]] = None
+    config_func: Callable[[], Dict[str, Any]] = None,
+    skip_videos: bool = False
 ) -> Dict[str, bool]:
     """Generate plots and movies from analysis results.
+
+    Pose-based visualizations (trajectory plots and the similarity dendrogram) are
+    always attempted. Video-based grid movies are only generated when videos are
+    available, i.e. when ``skip_videos`` is False and a ``video_dir`` is configured.
 
     Args:
         model_name: Name of the fitted model
@@ -244,9 +249,10 @@ def generate_plots_and_movies(
         coordinates: Raw coordinates dictionary
         project_path: Path to the project directory
         config_func: Optional function that returns configuration dictionary
+        skip_videos: When True, skip video-based grid movies entirely
 
     Returns:
-        Dictionary with success status for each visualization type
+        Dictionary with success status for each visualization type that was attempted
     """
     logger.info("Starting visualization generation...")
 
@@ -256,11 +262,10 @@ def generate_plots_and_movies(
 
     success_status = {
         'trajectory_plots': False,
-        'grid_movies': False,
         'dendrogram': False
     }
 
-    # Generate trajectory plots
+    # Generate trajectory plots (pose-based, no videos required)
     try:
         logger.info("Generating trajectory plots...")
         kpms.generate_trajectory_plots(
@@ -272,35 +277,40 @@ def generate_plots_and_movies(
         logger.warning(f"Trajectory plots generation failed: {e}")
         logger.warning("Continuing with other visualizations...")
 
-    # Generate grid movies with enhanced diagnostics
-    try:
-        logger.info("Generating grid movies...")
-        config = config_func()
-        video_dir = config.get('video_dir', 'Not specified')
-        logger.info(f"Video directory: {video_dir}")
-        logger.info(f"Processing {len(coordinates)} video(s) for grid movies...")
+    # Generate grid movies (video-based) only when videos are available
+    config = config_func()
+    video_dir = config.get('video_dir')
+    if skip_videos or not video_dir:
+        reason = "--skip-videos was set" if skip_videos else "no video directory is configured"
+        logger.info(f"Skipping grid movies ({reason})")
+    else:
+        success_status['grid_movies'] = False
+        try:
+            logger.info("Generating grid movies...")
+            logger.info(f"Video directory: {video_dir}")
+            logger.info(f"Processing {len(coordinates)} video(s) for grid movies...")
 
-        # Log video keys for diagnostics
-        for key in coordinates.keys():
-            logger.debug(f"  - Video key: {key}")
+            # Log video keys for diagnostics
+            for key in coordinates.keys():
+                logger.debug(f"  - Video key: {key}")
 
-        kpms.generate_grid_movies(
-            results, project_path, model_name, coordinates=coordinates, **config
-        )
-        logger.info("Grid movies generated successfully")
-        success_status['grid_movies'] = True
-    except Exception as e:
-        logger.warning(f"Grid movies generation failed: {e}")
+            kpms.generate_grid_movies(
+                results, project_path, model_name, coordinates=coordinates, **config
+            )
+            logger.info("Grid movies generated successfully")
+            success_status['grid_movies'] = True
+        except Exception as e:
+            logger.warning(f"Grid movies generation failed: {e}")
 
-        # Enhanced diagnostic logging for video decoding errors
-        if 'error decoding frame' in str(e):
-            logger.warning("Video decoding error detected. This may be due to:")
-            logger.warning("  - Codec incompatibility with vidio library")
-            logger.warning("  - Specific corrupted frames in the video")
-            logger.warning("  - Video file format not fully supported")
-            logger.warning("Consider running scripts/test_videos.py to diagnose video issues")
+            # Enhanced diagnostic logging for video decoding errors
+            if 'error decoding frame' in str(e):
+                logger.warning("Video decoding error detected. This may be due to:")
+                logger.warning("  - Codec incompatibility with vidio library")
+                logger.warning("  - Specific corrupted frames in the video")
+                logger.warning("  - Video file format not fully supported")
+                logger.warning("Consider running scripts/test_videos.py to diagnose video issues")
 
-        logger.warning("Continuing with other visualizations...")
+            logger.warning("Continuing with other visualizations...")
 
     # Generate similarity dendrogram
     try:
